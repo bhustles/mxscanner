@@ -1060,7 +1060,6 @@ def reset_dead_domains() -> int:
     Reset dead domains to unchecked so they get rescanned.
     Updates (does not delete): clears checked_at, mx_primary, etc. so they stay in domain_mx
     and get_unchecked_domains() will return them.
-    Also sets is_gi=true since dead domains from a GI scan are GI domains.
     Returns:
         Number of domains reset
     """
@@ -1079,8 +1078,7 @@ def reset_dead_domains() -> int:
                 mx_host_provider = NULL,
                 is_valid = true,
                 error_message = NULL,
-                dns_server = NULL,
-                is_gi = true
+                dns_server = NULL
             WHERE is_valid = false
         """)
         conn.commit()
