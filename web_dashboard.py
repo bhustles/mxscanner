@@ -1053,7 +1053,7 @@ DASHBOARD_HTML = """
                     alert('Error: ' + data.error);
                     return;
                 }
-                addMxLog('SYSTEM', 'Reset ' + formatNum(data.reset || 0) + ' dead domains to unchecked. Fixed is_gi on ' + formatNum(data.extra_fixed || 0) + ' more.', 'Info');
+                addMxLog('SYSTEM', 'Reset ' + formatNum(data.reset || 0) + ' dead domains to unchecked.', 'Info');
                 alert('Done! Reset ' + formatNum(data.reset || 0) + ' dead domains. Click Start Scan when ready.');
                 checkMxStatus(); // Refresh stats
             })
@@ -1825,6 +1825,7 @@ def api_mx_reset_dead():
         cursor.execute("SELECT COUNT(*) FROM domain_mx WHERE is_valid = false")
         count = cursor.fetchone()[0]
         if count > 0:
+            # Simple reset: clear checked status so they get rescanned
             cursor.execute("""
                 UPDATE domain_mx SET
                     checked_at = NULL,
@@ -1835,25 +1836,13 @@ def api_mx_reset_dead():
                     mx_host_provider = NULL,
                     is_valid = true,
                     error_message = NULL,
-                    dns_server = NULL,
-                    is_gi = true
+                    dns_server = NULL
                 WHERE is_valid = false
             """)
             conn.commit()
-        # Set is_gi=true on unchecked domains that are General_Internet in the emails table
-        cursor.execute("""
-            UPDATE domain_mx SET is_gi = true 
-            WHERE checked_at IS NULL 
-              AND domain IN (
-                  SELECT DISTINCT email_domain FROM emails 
-                  WHERE email_category = 'General_Internet' AND email_domain IS NOT NULL
-              )
-        """)
-        extra_fixed = cursor.rowcount
-        conn.commit()
         cursor.close()
         conn.close()
-        return jsonify({'status': 'ok', 'reset': count, 'extra_fixed': extra_fixed})
+        return jsonify({'status': 'ok', 'reset': count})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
