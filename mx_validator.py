@@ -321,12 +321,13 @@ def get_unchecked_domains(limit: int = None, only_gi: bool = True) -> List[tuple
     skip_tuple = tuple(SKIP_DOMAINS) if SKIP_DOMAINS else ('__none__',)
     
     # Simple: unchecked domains that are NOT Big4/Cable (from config.py)
+    # Sort alphabetically so we can see real domains first (not junk)
     sql = """
         SELECT domain, COALESCE(email_count, 0)
         FROM domain_mx
         WHERE checked_at IS NULL
           AND domain NOT IN %s
-        ORDER BY email_count DESC
+        ORDER BY domain ASC
     """
     if limit:
         sql += f" LIMIT {limit}"
