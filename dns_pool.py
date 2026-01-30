@@ -44,11 +44,11 @@ def _get_resolver(server: str, timeout: float) -> dns.resolver.Resolver:
     return _thread_local.resolvers[server]
 
 
-def resolve_mx(domain: str, timeout: float = 0.5) -> Tuple[Optional[List[tuple]], Optional[str]]:
+def resolve_mx(domain: str, timeout: float = 1.0) -> Tuple[Optional[List[tuple]], Optional[str]]:
     """
     Resolve MX records - LOCK-FREE, high performance.
     Single attempt only, no retries (timeout/lifetime both = timeout).
-    Fast fail; dead domains can be rescanned later.
+    1.0s timeout = balance between speed and accuracy (0.5s was too aggressive).
     Returns:
         Tuple of (mx_records, dns_server_used)
     """
@@ -81,7 +81,7 @@ def resolve_mx(domain: str, timeout: float = 0.5) -> Tuple[Optional[List[tuple]]
 # Legacy compatibility
 class DNSPool:
     """Legacy wrapper - just calls the lock-free function."""
-    def __init__(self, servers=None, timeout=0.5):
+    def __init__(self, servers=None, timeout=1.0):
         self.timeout = timeout
         self.servers = servers or DNS_SERVERS
     
