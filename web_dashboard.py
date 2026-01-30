@@ -437,6 +437,10 @@ DASHBOARD_HTML = """
                     <div class="mx-stat-label">Checked</div>
                 </div>
                 <div class="mx-stat">
+                    <div class="mx-stat-value" id="mx-remaining" style="color: #ffc107;">0</div>
+                    <div class="mx-stat-label">Remaining</div>
+                </div>
+                <div class="mx-stat">
                     <div class="mx-stat-value" id="mx-valid" style="color: #28a745;">0</div>
                     <div class="mx-stat-label">Valid (domains)</div>
                     <div class="mx-stat-sub" id="mx-valid-emails" style="color: #28a745; font-size: 0.85em;">0 emails</div>
@@ -477,22 +481,18 @@ DASHBOARD_HTML = """
                 </div>
             </div>
             
-            <!-- Terminal Logs Side by Side -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
-                <div>
-                    <h3 style="color: #00d4ff; margin: 0 0 10px;">Live Log (Domain Results)</h3>
-                    <div class="mx-terminal" id="mx-terminal" style="height: 300px;">
-                        <div class="mx-log-line" style="color: #666;">// MX Validator ready. Click "Start Scan" to begin checking domains.</div>
-                        <div class="mx-log-line" style="color: #666;">// Will check GI domains (unchecked only) using rotating DNS servers.</div>
-                    </div>
-                </div>
-                <div>
-                    <h3 style="color: #28a745; margin: 0 0 10px;">DB Commits (500 domain batches)</h3>
-                    <div class="mx-terminal" id="mx-flush-terminal" style="height: 300px; border-color: #28a745;">
-                        <div class="mx-log-line" style="color: #666;">// Database commits will appear here as batches of 500 are written.</div>
-                        <div class="mx-log-line" style="color: #666;">// Each line = 500 domains saved to domain_mx table.</div>
-                    </div>
-                </div>
+            <!-- Live Log -->
+            <h3 style="color: #00d4ff; margin: 20px 0 10px;">Live Log (Domain Results) - ETA: <span id="mx-eta" style="color: #ffc107;">calculating...</span></h3>
+            <div class="mx-terminal" id="mx-terminal" style="height: 250px;">
+                <div class="mx-log-line" style="color: #666;">// MX Validator ready. Click "Start Scan" to begin checking domains.</div>
+                <div class="mx-log-line" style="color: #666;">// Will check GI domains (unchecked only) using rotating DNS servers.</div>
+            </div>
+            
+            <!-- DB Commits Log -->
+            <h3 style="color: #28a745; margin: 20px 0 10px;">DB Commits (500 domain batches)</h3>
+            <div class="mx-terminal" id="mx-flush-terminal" style="height: 150px; border-color: #28a745;">
+                <div class="mx-log-line" style="color: #666;">// Database commits will appear here as batches of 500 are written.</div>
+                <div class="mx-log-line" style="color: #666;">// Each line = 500 domains saved to domain_mx table.</div>
             </div>
             
             <!-- Category Breakdown (domains + email counts per category) -->
@@ -962,6 +962,8 @@ DASHBOARD_HTML = """
         function updateMxStats() {
             document.getElementById('mx-total').textContent = formatNum(mxStats.total);
             document.getElementById('mx-checked').textContent = formatNum(mxStats.checked);
+            var remaining = Math.max(0, mxStats.total - mxStats.checked);
+            document.getElementById('mx-remaining').textContent = formatNum(remaining);
             document.getElementById('mx-valid').textContent = formatNum(mxStats.valid);
             document.getElementById('mx-dead').textContent = formatNum(mxStats.dead);
             document.getElementById('mx-rate').textContent = mxStats.rate;
@@ -974,6 +976,24 @@ DASHBOARD_HTML = """
             document.getElementById('mx-progress-fill').style.width = pct + '%';
             document.getElementById('mx-progress-text').textContent = 
                 formatNum(mxStats.checked) + ' / ' + formatNum(mxStats.total) + ' (' + pct.toFixed(1) + '%)';
+            
+            // Calculate ETA
+            var etaEl = document.getElementById('mx-eta');
+            if (etaEl && mxStats.rate > 0 && mxStats.total > mxStats.checked) {
+                var remaining = mxStats.total - mxStats.checked;
+                var secondsLeft = remaining / mxStats.rate;
+                var hours = Math.floor(secondsLeft / 3600);
+                var mins = Math.floor((secondsLeft % 3600) / 60);
+                if (hours > 0) {
+                    etaEl.textContent = hours + 'h ' + mins + 'm remaining';
+                } else if (mins > 0) {
+                    etaEl.textContent = mins + ' min remaining';
+                } else {
+                    etaEl.textContent = 'almost done';
+                }
+            } else if (etaEl) {
+                etaEl.textContent = mxStats.status === 'complete' ? 'complete' : 'calculating...';
+            }
             
             document.getElementById('mx-cat-google').textContent = formatNum(mxCategories.Google || mxCategories.google || 0);
             document.getElementById('mx-cat-microsoft').textContent = formatNum(mxCategories.Microsoft || mxCategories.microsoft || 0);
