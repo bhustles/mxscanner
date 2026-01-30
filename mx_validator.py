@@ -419,20 +419,27 @@ def _write_batch_to_db(batch):
         cursor.close()
         
         # Count valid/dead in this batch
-        valid_count = sum(1 for v in values if v[6] == True)  # is_valid is index 6
-        dead_count = len(values) - valid_count
+        try:
+            valid_count = sum(1 for v in values if v[6] == True)  # is_valid is index 6
+            dead_count = len(values) - valid_count
+        except:
+            valid_count = 0
+            dead_count = 0
         
-        # Emit flush event for the dashboard
-        log_result({
-            'domain': 'DB_FLUSH',
-            'provider': f'{len(batch)} domains',
-            'category': 'Flush',
-            'is_valid': True,
-            'email_count': 0,
-            'valid_count': valid_count,
-            'dead_count': dead_count,
-            'batch_size': len(batch)
-        })
+        # Emit flush event for the dashboard (non-blocking, don't crash if this fails)
+        try:
+            log_result({
+                'domain': 'DB_FLUSH',
+                'provider': f'{len(batch)} domains',
+                'category': 'Flush',
+                'is_valid': True,
+                'email_count': 0,
+                'valid_count': valid_count,
+                'dead_count': dead_count,
+                'batch_size': len(batch)
+            })
+        except Exception as log_err:
+            print(f"Warning: Failed to log flush event: {log_err}", flush=True)
         
         return len(batch)
         
@@ -472,11 +479,13 @@ def save_mx_result(domain: str, mx_records: Optional[List[tuple]],
     
     # Flush every 500 results (outside the lock)
     if buffer_len >= 500:
+        batch = None
         with _write_buffer_lock:
             if len(_write_buffer) >= 500:
                 batch = _write_buffer[:500]
                 _write_buffer = _write_buffer[500:]
-        _write_batch_to_db(batch)
+        if batch:
+            _write_batch_to_db(batch)
 
 
 def batch_apply_emails(domains_per_batch: int = 500):
@@ -723,6 +732,9 @@ def log_result(result: Dict[str, Any]):
         _log_queue.put_nowait(log_entry)
     except queue.Full:
         pass  # Drop old logs if queue is full
+    except Exception as e:
+        # Don't let logging crash the scanner
+        print(f"Warning: log_result error: {e}", flush=True)
 
 
 def get_log_stream() -> Generator[str, None, None]:
