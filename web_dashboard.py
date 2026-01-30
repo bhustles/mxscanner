@@ -509,7 +509,7 @@ DASHBOARD_HTML = """
             </div>
             
             <!-- DNS Server Performance (Valid/Dead) -->
-            <h3 style="color: #00d4ff; margin: 20px 0 10px;">DNS Server Performance (Valid/Dead)</h3>
+            <h3 style="color: #00d4ff; margin: 20px 0 10px;">DNS Server Performance (Valid/Dead) <button onclick="resetDnsStats()" style="font-size: 12px; padding: 3px 10px; margin-left: 10px;">Clear Stats</button></h3>
             <div id="mx-dns-servers" class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
                 <div class="stat-card"><h3>Google-1</h3><div class="value" id="dns-google1" style="font-size: 14px;">0 / 0</div></div>
                 <div class="stat-card"><h3>Google-2</h3><div class="value" id="dns-google2" style="font-size: 14px;">0 / 0</div></div>
