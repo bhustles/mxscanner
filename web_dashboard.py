@@ -465,6 +465,7 @@ DASHBOARD_HTML = """
                 </select>
                 <button type="button" class="btn-start" id="mx-start-btn" onclick="startMxScan()">Start Scan</button>
                 <button type="button" style="background: #ffc107; color: #000;" id="mx-reset-dead-only-btn" onclick="resetDeadOnly()" title="Reset dead domains to unchecked (no scan)">Reset dead only</button>
+                <button type="button" style="background: #6f42c1;" id="mx-sync-gi-btn" onclick="syncGiDomains()" title="Sync is_gi flag with emails table (finds missing GI domains)">Sync GI Domains</button>
                 <button type="button" class="btn-pause" onclick="pauseMxScan()" id="mx-pause-btn" disabled>Pause</button>
                 <button type="button" class="btn-stop" onclick="stopMxScan()" id="mx-stop-btn" disabled>Stop</button>
                 <button type="button" style="background: #17a2b8; margin-left: 20px;" onclick="applyMxResults()">Apply to Emails</button>
@@ -476,11 +477,22 @@ DASHBOARD_HTML = """
                 </div>
             </div>
             
-            <!-- Terminal Log -->
-            <h3 style="color: #00d4ff; margin: 20px 0 10px;">Live Log</h3>
-            <div class="mx-terminal" id="mx-terminal">
-                <div class="mx-log-line" style="color: #666;">// MX Validator ready. Click "Start Scan" to begin checking domains.</div>
-                <div class="mx-log-line" style="color: #666;">// Will check GI domains (unchecked only) using rotating DNS servers.</div>
+            <!-- Terminal Logs Side by Side -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                <div>
+                    <h3 style="color: #00d4ff; margin: 0 0 10px;">Live Log (Domain Results)</h3>
+                    <div class="mx-terminal" id="mx-terminal" style="height: 300px;">
+                        <div class="mx-log-line" style="color: #666;">// MX Validator ready. Click "Start Scan" to begin checking domains.</div>
+                        <div class="mx-log-line" style="color: #666;">// Will check GI domains (unchecked only) using rotating DNS servers.</div>
+                    </div>
+                </div>
+                <div>
+                    <h3 style="color: #28a745; margin: 0 0 10px;">DB Commits (500 domain batches)</h3>
+                    <div class="mx-terminal" id="mx-flush-terminal" style="height: 300px; border-color: #28a745;">
+                        <div class="mx-log-line" style="color: #666;">// Database commits will appear here as batches of 500 are written.</div>
+                        <div class="mx-log-line" style="color: #666;">// Each line = 500 domains saved to domain_mx table.</div>
+                    </div>
+                </div>
             </div>
             
             <!-- Category Breakdown (domains + email counts per category) -->
@@ -915,6 +927,36 @@ DASHBOARD_HTML = """
             }
         }
         
+        var flushCount = 0;
+        var totalFlushed = 0;
+        
+        function addFlushLog(info, category, validCount, deadCount) {
+            var terminal = document.getElementById('mx-flush-terminal');
+            var time = new Date().toLocaleTimeString();
+            flushCount++;
+            totalFlushed += 500;
+            
+            var isError = category === 'Error';
+            var color = isError ? '#dc3545' : '#28a745';
+            var validStr = validCount !== undefined ? validCount : '?';
+            var deadStr = deadCount !== undefined ? deadCount : '?';
+            
+            var line = document.createElement('div');
+            line.className = 'mx-log-line';
+            line.innerHTML = '<span class="mx-log-time">[' + time + ']</span> ' +
+                '<span style="color: ' + color + '; font-weight: bold;">COMMIT #' + flushCount + '</span> ' +
+                '<span style="color: #888;">' + info + '</span> ' +
+                '<span style="color: #28a745;">' + validStr + ' valid</span> / ' +
+                '<span style="color: #dc3545;">' + deadStr + ' dead</span> ' +
+                '<span style="color: #666;">(total: ' + formatNum(totalFlushed) + ')</span>';
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            
+            while (terminal.children.length > 200) {
+                terminal.removeChild(terminal.firstChild);
+            }
+        }
+        
         var mxCategoryEmails = { Google: 0, Microsoft: 0, Yahoo: 0, HostGator: 0, GoDaddy: 0, Real_GI: 0, Parked: 0, Dead: 0 };
         
         function updateMxStats() {
@@ -1021,6 +1063,31 @@ DASHBOARD_HTML = """
             });
         }
         
+        function syncGiDomains() {
+            if (!confirm('Sync GI domains from emails table? This will find missing domains and flag them for scanning (preserves existing scan results).')) return;
+            document.getElementById('mx-sync-gi-btn').disabled = true;
+            addMxLog('SYSTEM', 'Syncing GI domains from emails table...', 'Info');
+            fetch('/api/mx/sync-gi', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                document.getElementById('mx-sync-gi-btn').disabled = false;
+                if (data.error) {
+                    addMxLog('SYSTEM', 'Error: ' + data.error, 'Error');
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                var msg = 'GI Sync complete! Before: ' + formatNum(data.gi_before) + ' -> After: ' + formatNum(data.gi_after) + '. Inserted ' + formatNum(data.domains_inserted) + ' new, flagged ' + formatNum(data.domains_flagged) + ' existing. Ready to scan: ' + formatNum(data.unchecked_to_scan);
+                addMxLog('SYSTEM', msg, 'Info');
+                alert('Sync complete! GI domains: ' + formatNum(data.gi_before) + ' -> ' + formatNum(data.gi_after) + '. Inserted: ' + formatNum(data.domains_inserted) + ', Flagged: ' + formatNum(data.domains_flagged) + '. Ready to scan: ' + formatNum(data.unchecked_to_scan));
+                checkMxStatus(); // Refresh stats
+            })
+            .catch(function(e) {
+                document.getElementById('mx-sync-gi-btn').disabled = false;
+                addMxLog('SYSTEM', 'Failed: ' + e, 'Error');
+                alert('Fetch error: ' + e);
+            });
+        }
+        
         function connectMxStream() {
             if (typeof(EventSource) !== "undefined") {
                 mxEventSource = new EventSource('/api/mx/stream');
@@ -1044,7 +1111,11 @@ DASHBOARD_HTML = """
                             document.getElementById('mx-pause-btn').textContent = 'Pause';
                         }
                     } else if (data.type === 'log') {
-                        addMxLog(data.domain, data.mx, data.category, data.dns_server);
+                        if (data.domain === 'DB_FLUSH') {
+                            addFlushLog(data.mx, data.category, data.valid_count, data.dead_count);
+                        } else {
+                            addMxLog(data.domain, data.mx, data.category, data.dns_server);
+                        }
                     } else if (data.type === 'complete') {
                         addMxLog('SYSTEM', 'Scan complete!', 'Info');
                         stopMxScan();
@@ -1853,6 +1924,69 @@ def api_mx_full_reset():
             'final_gi_count': total_gi,
             'unchecked_gi': unchecked_gi,
             'dead_count': dead
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/mx/sync-gi', methods=['POST'])
+def api_mx_sync_gi():
+    """
+    SYNC GI FLAG (preserves scan progress):
+    1. Find all domains in emails table that are General_Internet
+    2. Add missing domains to domain_mx
+    3. Set is_gi=true for all GI domains (without clearing existing scans)
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Get count before
+        cursor.execute("SELECT COUNT(*) FROM domain_mx WHERE is_gi = true")
+        gi_before = cursor.fetchone()[0]
+        
+        # Step 1: Insert any missing GI domains into domain_mx
+        cursor.execute("""
+            INSERT INTO domain_mx (domain, email_count, is_gi)
+            SELECT e.email_domain, COUNT(*), true
+            FROM emails e
+            WHERE e.email_category = 'General_Internet'
+              AND e.email_domain IS NOT NULL AND e.email_domain != ''
+              AND NOT EXISTS (SELECT 1 FROM domain_mx d WHERE d.domain = e.email_domain)
+            GROUP BY e.email_domain
+        """)
+        inserted = cursor.rowcount
+        conn.commit()
+        
+        # Step 2: Update is_gi=true for existing GI domains that aren't flagged
+        cursor.execute("""
+            UPDATE domain_mx SET is_gi = true
+            WHERE is_gi = false
+              AND domain IN (
+                SELECT DISTINCT email_domain FROM emails
+                WHERE email_category = 'General_Internet' 
+                  AND email_domain IS NOT NULL AND email_domain != ''
+            )
+        """)
+        updated = cursor.rowcount
+        conn.commit()
+        
+        # Get count after
+        cursor.execute("SELECT COUNT(*) FROM domain_mx WHERE is_gi = true")
+        gi_after = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM domain_mx WHERE is_gi = true AND checked_at IS NULL")
+        unchecked = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'gi_before': gi_before,
+            'gi_after': gi_after,
+            'domains_inserted': inserted,
+            'domains_flagged': updated,
+            'unchecked_to_scan': unchecked
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

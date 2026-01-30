@@ -32,55 +32,16 @@ DNS_SERVER_DISPLAY = {
 }
 
 # =============================================================================
-# SKIP DOMAINS - Big ISPs and Cable Providers (we KNOW they work)
+# SKIP DOMAINS - Built from config.py (Big4 + Cable = not GI)
 # =============================================================================
 
-SKIP_DOMAINS = {
-    # Google
-    'gmail.com', 'googlemail.com',
-    
-    # Microsoft
-    'hotmail.com', 'outlook.com', 'live.com', 'msn.com', 'hotmail.co.uk',
-    'live.co.uk', 'outlook.co.uk', 'hotmail.fr', 'live.fr', 'hotmail.de',
-    'live.de', 'hotmail.it', 'live.it', 'hotmail.es', 'live.es',
-    
-    # Yahoo
-    'yahoo.com', 'ymail.com', 'rocketmail.com', 'yahoo.co.uk', 'yahoo.ca',
-    'yahoo.com.au', 'yahoo.co.in', 'yahoo.fr', 'yahoo.de', 'yahoo.it',
-    'yahoo.es', 'yahoo.com.br', 'yahoo.co.jp',
-    
-    # AOL / Verizon Media
-    'aol.com', 'aim.com', 'aol.co.uk', 'verizon.net',
-    
-    # Apple
-    'icloud.com', 'me.com', 'mac.com',
-    
-    # Cable / ISP Providers
-    'comcast.net', 'xfinity.com',
-    'att.net', 'sbcglobal.net', 'bellsouth.net', 'pacbell.net', 'ameritech.net',
-    'charter.net', 'spectrum.net',
-    'cox.net', 'cox.com',
-    'earthlink.net',
-    'centurylink.net', 'centurytel.net', 'embarqmail.com', 'q.com',
-    'frontier.com', 'frontiernet.net',
-    'windstream.net',
-    'optimum.net', 'optonline.net',
-    'twc.com', 'roadrunner.com', 'rr.com', 'tampabay.rr.com', 'nc.rr.com', 'austin.rr.com',
-    'suddenlink.net',
-    'mediacombb.net',
-    'rcn.com',
-    'ptd.net',
-    
-    # ProtonMail
-    'protonmail.com', 'proton.me', 'pm.me',
-    
-    # Other major free email
-    'mail.com', 'email.com', 'usa.com',
-    'gmx.com', 'gmx.net', 'gmx.de',
-    'web.de', 'freenet.de', 't-online.de',
-    'mail.ru', 'yandex.com', 'yandex.ru',
-    'qq.com', '163.com', '126.com', 'sina.com',
-}
+# Import from config.py - any domain in DOMAIN_MAPPING is NOT General Internet
+from config import DOMAIN_MAPPING
+
+# SKIP_DOMAINS = all domains from config.py (Big4_ISP + Cable_Provider)
+SKIP_DOMAINS = set(DOMAIN_MAPPING.keys())
+
+print(f"[MX Validator] Loaded {len(SKIP_DOMAINS)} Big4/Cable domains from config.py to skip", flush=True)
 
 # =============================================================================
 # VALIDATOR STATE
@@ -342,51 +303,37 @@ def get_gi_domains() -> List[tuple]:
 def get_unchecked_domains(limit: int = None, only_gi: bool = True) -> List[tuple]:
     """
     Get domains that haven't been MX-checked yet.
-    By default only returns General Internet domains (~500K), not all 3.7M.
-    Reads from domain_mx only (no emails table scan).
+    
+    SIMPLE LOGIC: If domain is NOT in SKIP_DOMAINS (from config.py), it's GI.
+    No need for is_gi flag - config.py is the source of truth.
     """
     conn = get_db()
     cursor = conn.cursor()
     
-    # Check if is_gi column exists (older DBs may not have it)
-    cursor.execute("""
-        SELECT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name='domain_mx' AND column_name='is_gi')
-    """)
-    has_is_gi = cursor.fetchone()[0]
-    
     print("DEBUG: Checking domain_mx table...", flush=True)
     cursor.execute("SELECT COUNT(*) FROM domain_mx")
     total_domains = cursor.fetchone()[0]
-    # Checked = we've done an MX lookup (valid or dead). checked_at is set on save.
     cursor.execute("SELECT COUNT(*) FROM domain_mx WHERE checked_at IS NOT NULL")
     already_checked = cursor.fetchone()[0]
     print(f"DEBUG: domain_mx total: {total_domains:,}, already checked: {already_checked:,}", flush=True)
+    print(f"DEBUG: Skipping {len(SKIP_DOMAINS)} Big4/Cable domains from config.py", flush=True)
     
-    skip_tuple = tuple(SKIP_DOMAINS)
-    # Unchecked = never looked up (checked_at IS NULL). Do NOT re-scan dead domains.
-    if only_gi and has_is_gi:
-        sql = """
-            SELECT domain, COALESCE(email_count, 0)
-            FROM domain_mx
-            WHERE checked_at IS NULL AND is_gi = true
-              AND domain NOT IN %s
-            ORDER BY email_count DESC
-        """
-    else:
-        sql = """
-            SELECT domain, COALESCE(email_count, 0)
-            FROM domain_mx
-            WHERE checked_at IS NULL
-              AND domain NOT IN %s
-            ORDER BY email_count DESC
-        """
+    skip_tuple = tuple(SKIP_DOMAINS) if SKIP_DOMAINS else ('__none__',)
+    
+    # Simple: unchecked domains that are NOT Big4/Cable (from config.py)
+    sql = """
+        SELECT domain, COALESCE(email_count, 0)
+        FROM domain_mx
+        WHERE checked_at IS NULL
+          AND domain NOT IN %s
+        ORDER BY email_count DESC
+    """
     if limit:
         sql += f" LIMIT {limit}"
     
     cursor.execute(sql, (skip_tuple,))
     domains = cursor.fetchall()
-    print(f"DEBUG: Unchecked domains to scan (only_gi={only_gi}): {len(domains):,}", flush=True)
+    print(f"DEBUG: Unchecked GI domains to scan: {len(domains):,}", flush=True)
     
     cursor.close()
     conn.close()
@@ -470,10 +417,35 @@ def _write_batch_to_db(batch):
         
         conn.commit()
         cursor.close()
+        
+        # Count valid/dead in this batch
+        valid_count = sum(1 for v in values if v[6] == True)  # is_valid is index 6
+        dead_count = len(values) - valid_count
+        
+        # Emit flush event for the dashboard
+        log_result({
+            'domain': 'DB_FLUSH',
+            'provider': f'{len(batch)} domains',
+            'category': 'Flush',
+            'is_valid': True,
+            'email_count': 0,
+            'valid_count': valid_count,
+            'dead_count': dead_count,
+            'batch_size': len(batch)
+        })
+        
         return len(batch)
         
     except Exception as e:
         print(f"Error in batch write ({len(batch)} items): {e}", flush=True)
+        log_result({
+            'domain': 'DB_FLUSH',
+            'provider': f'ERROR: {str(e)[:50]}',
+            'category': 'Error',
+            'is_valid': False,
+            'email_count': 0,
+            'batch_size': len(batch) if batch else 0
+        })
         try:
             conn.rollback()
         except:
@@ -739,6 +711,15 @@ def log_result(result: Dict[str, Any]):
             'email_count': result['email_count'],
             'dns_server': dns_display
         }
+        
+        # Add flush-specific fields if present
+        if 'valid_count' in result:
+            log_entry['valid_count'] = result['valid_count']
+        if 'dead_count' in result:
+            log_entry['dead_count'] = result['dead_count']
+        if 'batch_size' in result:
+            log_entry['batch_size'] = result['batch_size']
+            
         _log_queue.put_nowait(log_entry)
     except queue.Full:
         pass  # Drop old logs if queue is full
