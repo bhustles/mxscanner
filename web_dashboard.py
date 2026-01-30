@@ -242,6 +242,7 @@ DASHBOARD_HTML = """
             <button type="button" class="tab-btn" onclick="showTab('stats')">Stats</button>
             <button type="button" class="tab-btn" onclick="showTab('query')">Query Tool</button>
             <button type="button" class="tab-btn active" onclick="showTab('mx')">MX Validator</button>
+            <button type="button" class="tab-btn" onclick="showTab('import')">Import Data</button>
             <button type="button" class="tab-btn" onclick="showTab('config')">Domain Config</button>
         </div>
         
@@ -381,6 +382,12 @@ DASHBOARD_HTML = """
                     <select id="clickers">
                         <option value="">No</option>
                         <option value="true">Yes</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Source File</label>
+                    <select id="file_source" style="max-width: 180px;">
+                        <option value="">All Files</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -536,6 +543,152 @@ DASHBOARD_HTML = """
         </div>
         
         </div><!-- END MX TAB -->
+        
+        <!-- IMPORT DATA TAB -->
+        <div id="tab-import" class="tab-content">
+        <div class="section">
+            <h2>Import External Data</h2>
+            <p style="color: #888; margin-bottom: 15px;">Import email data from external files with enrichment upsert. Same email in multiple files = combined/enriched record.</p>
+            
+            <!-- Directory Input -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
+                <label style="color: #aaa;">Directory:</label>
+                <input type="text" id="import-dir" style="flex: 1; padding: 8px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 4px;" 
+                       placeholder="C:\\EmailData\\DataRickyJeffSep22\\DataRickyJeffSep22" value="C:\\EmailData\\DataRickyJeffSep22\\DataRickyJeffSep22">
+                <button onclick="openDirBrowser()" style="background: #6c757d;">Browse...</button>
+                <button onclick="scanImportDir()">Scan Files</button>
+            </div>
+            
+            <!-- Directory Browser Modal -->
+            <div id="dir-browser-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; padding: 50px;">
+                <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 10px; max-width: 600px; margin: 0 auto; max-height: 70vh; display: flex; flex-direction: column;">
+                    <div style="padding: 15px 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="margin: 0; color: #00d4ff;">Select Directory</h3>
+                        <button onclick="closeDirBrowser()" style="background: #dc3545; padding: 5px 15px;">Close</button>
+                    </div>
+                    <div style="padding: 10px 20px; border-bottom: 1px solid #333; background: #252525;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <span style="color: #888;">Path:</span>
+                            <input type="text" id="dir-browser-path" style="flex: 1; padding: 6px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 4px;" value="C:\\EmailData">
+                            <button onclick="navigateToPath()" style="padding: 6px 12px;">Go</button>
+                        </div>
+                    </div>
+                    <div id="dir-browser-list" style="flex: 1; overflow-y: auto; padding: 10px 20px;">
+                        <div style="color: #666;">Loading...</div>
+                    </div>
+                    <div style="padding: 15px 20px; border-top: 1px solid #333; display: flex; justify-content: flex-end; gap: 10px;">
+                        <button onclick="selectCurrentDir()" style="background: #28a745;">Select This Directory</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
+                <label style="color: #aaa;">Data Source Label:</label>
+                <input type="text" id="import-source" style="width: 250px; padding: 8px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 4px;" 
+                       placeholder="RickyJeff_Sep22" value="RickyJeff_Sep22">
+            </div>
+            
+            <!-- File List -->
+            <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 5px; padding: 10px; margin-bottom: 15px; max-height: 300px; overflow-y: auto;">
+                <div style="display: flex; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #333;">
+                    <input type="checkbox" id="import-select-all" checked onchange="toggleAllImportFiles()" style="margin-right: 10px;">
+                    <label for="import-select-all" style="color: #aaa; font-weight: bold;">Select All Files</label>
+                </div>
+                <div id="import-file-list" style="color: #666;">
+                    Click "Scan Directory" to list files...
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button onclick="previewSelectedFile()" style="background: #6c757d;">Preview Selected</button>
+                <button onclick="startImport()" style="background: #28a745;" id="btn-start-import">Start Import</button>
+                <button onclick="stopImport()" style="background: #dc3545; display: none;" id="btn-stop-import">Stop Import</button>
+            </div>
+            
+            <!-- Progress Section -->
+            <div id="import-progress-section" style="display: none;">
+                <h3 style="color: #00d4ff; margin: 20px 0 10px;">Import Progress</h3>
+                <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 5px; padding: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span>Status: <strong id="import-status" style="color: #ffc107;">Idle</strong></span>
+                        <span>File: <strong id="import-current-file">-</strong> (<span id="import-file-progress">0/0</span>)</span>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div style="background: #333; border-radius: 5px; height: 25px; margin-bottom: 15px; overflow: hidden;">
+                        <div id="import-progress-bar" style="background: linear-gradient(90deg, #28a745, #20c997); height: 100%; width: 0%; transition: width 0.3s; display: flex; align-items: center; justify-content: center;">
+                            <span id="import-progress-pct" style="color: #fff; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">0%</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Stats -->
+                    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                        <div style="background: #252525; padding: 10px; border-radius: 5px; text-align: center;">
+                            <div style="color: #888; font-size: 0.85em;">Processed</div>
+                            <div style="color: #00d4ff; font-size: 1.2em; font-weight: bold;" id="import-total-processed">0</div>
+                        </div>
+                        <div style="background: #252525; padding: 10px; border-radius: 5px; text-align: center;">
+                            <div style="color: #888; font-size: 0.85em;">New Records</div>
+                            <div style="color: #28a745; font-size: 1.2em; font-weight: bold;" id="import-new-records">0</div>
+                        </div>
+                        <div style="background: #252525; padding: 10px; border-radius: 5px; text-align: center;">
+                            <div style="color: #888; font-size: 0.85em;">Enriched</div>
+                            <div style="color: #ffc107; font-size: 1.2em; font-weight: bold;" id="import-enriched">0</div>
+                        </div>
+                        <div style="background: #252525; padding: 10px; border-radius: 5px; text-align: center;">
+                            <div style="color: #888; font-size: 0.85em;">Rate</div>
+                            <div style="color: #17a2b8; font-size: 1.2em; font-weight: bold;" id="import-rate">0/s</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Category Breakdown -->
+                    <h4 style="color: #aaa; margin: 15px 0 10px;">By Category (MX Status)</h4>
+                    <div class="stats-grid" style="grid-template-columns: repeat(5, 1fr); gap: 10px;">
+                        <div style="background: #252525; padding: 10px; border-radius: 5px; text-align: center;">
+                            <div style="color: #888; font-size: 0.8em;">Big4 ISP</div>
+                            <div style="color: #28a745; font-size: 1.1em;" id="import-big4">0</div>
+                        </div>
+                        <div style="background: #252525; padding: 10px; border-radius: 5px; text-align: center;">
+                            <div style="color: #888; font-size: 0.8em;">Cable</div>
+                            <div style="color: #28a745; font-size: 1.1em;" id="import-cable">0</div>
+                        </div>
+                        <div style="background: #252525; padding: 10px; border-radius: 5px; text-align: center;">
+                            <div style="color: #888; font-size: 0.8em;">GI Valid</div>
+                            <div style="color: #28a745; font-size: 1.1em;" id="import-gi-valid">0</div>
+                        </div>
+                        <div style="background: #252525; padding: 10px; border-radius: 5px; text-align: center;">
+                            <div style="color: #888; font-size: 0.8em;">GI Dead</div>
+                            <div style="color: #dc3545; font-size: 1.1em;" id="import-gi-dead">0</div>
+                        </div>
+                        <div style="background: #252525; padding: 10px; border-radius: 5px; text-align: center;">
+                            <div style="color: #888; font-size: 0.8em;">GI New</div>
+                            <div style="color: #ffc107; font-size: 1.1em;" id="import-gi-new">0</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Import Log -->
+                    <h4 style="color: #aaa; margin: 15px 0 10px;">Import Log</h4>
+                    <div id="import-log" style="background: #0a0a0a; border: 1px solid #333; border-radius: 5px; padding: 10px; height: 150px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #888;">
+                        <div style="color: #555;">Waiting for import to start...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Preview Modal -->
+            <div id="import-preview-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; padding: 50px;">
+                <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 10px; max-width: 1000px; margin: 0 auto; max-height: 80vh; overflow: auto;">
+                    <div style="padding: 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="margin: 0; color: #00d4ff;">File Preview</h3>
+                        <button onclick="closePreviewModal()" style="background: #dc3545;">Close</button>
+                    </div>
+                    <div id="import-preview-content" style="padding: 20px;">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div><!-- END IMPORT TAB -->
         
         <!-- DOMAIN CONFIG TAB -->
         <div id="tab-config" class="tab-content">
@@ -750,10 +903,41 @@ DASHBOARD_HTML = """
                 min_score: document.getElementById('min_score').value,
                 state: document.getElementById('state').value.toUpperCase(),
                 clickers: document.getElementById('clickers').value,
+                file_source: document.getElementById('file_source').value,
                 limit: '50000'
             });
             window.location.href = '/api/export?' + params;
         }
+        
+        function loadFileSources() {
+            fetch('/api/file-sources')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var select = document.getElementById('file_source');
+                if (!select) return;
+                
+                // Keep first option (All Files)
+                select.innerHTML = '<option value="">All Files</option>';
+                
+                if (data.sources && data.sources.length > 0) {
+                    for (var i = 0; i < data.sources.length; i++) {
+                        var s = data.sources[i];
+                        var opt = document.createElement('option');
+                        opt.value = s.filename;
+                        opt.textContent = s.filename + ' (' + formatNum(s.email_count) + ')';
+                        select.appendChild(opt);
+                    }
+                }
+            })
+            .catch(function(e) {
+                console.error('Error loading file sources:', e);
+            });
+        }
+        
+        // Load file sources on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFileSources();
+        });
         
         // =====================================================
         // TAB NAVIGATION
@@ -1421,6 +1605,385 @@ DASHBOARD_HTML = """
                 closeDeadModal();
             }
         });
+        
+        // =====================================================
+        // IMPORT DATA TAB FUNCTIONS
+        // =====================================================
+        
+        var importFiles = [];
+        var importStatusInterval = null;
+        var currentBrowsePath = 'C:\\EmailData';
+        
+        // Directory Browser Functions
+        function openDirBrowser() {
+            document.getElementById('dir-browser-modal').style.display = 'block';
+            currentBrowsePath = document.getElementById('import-dir').value || 'C:\\EmailData';
+            document.getElementById('dir-browser-path').value = currentBrowsePath;
+            loadDirContents(currentBrowsePath);
+        }
+        
+        function closeDirBrowser() {
+            document.getElementById('dir-browser-modal').style.display = 'none';
+        }
+        
+        function navigateToPath() {
+            var path = document.getElementById('dir-browser-path').value;
+            if (path) {
+                loadDirContents(path);
+            }
+        }
+        
+        function loadDirContents(path) {
+            currentBrowsePath = path;
+            document.getElementById('dir-browser-path').value = path;
+            document.getElementById('dir-browser-list').innerHTML = '<div style="color: #ffc107;">Loading...</div>';
+            
+            fetch('/api/browse-dir', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({path: path})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    document.getElementById('dir-browser-list').innerHTML = '<div style="color: #dc3545;">Error: ' + data.error + '</div>';
+                    return;
+                }
+                
+                var container = document.getElementById('dir-browser-list');
+                container.innerHTML = '';
+                
+                // Parent directory link
+                if (data.parent) {
+                    var parentDiv = document.createElement('div');
+                    parentDiv.style.cssText = 'padding: 10px; cursor: pointer; border-bottom: 1px solid #333; display: flex; align-items: center;';
+                    parentDiv.innerHTML = '<span style="color: #ffc107; margin-right: 10px;">📁</span><span style="color: #ffc107;">..</span><span style="color: #666; margin-left: 10px;">(Parent Directory)</span>';
+                    parentDiv.onmouseover = function() { this.style.background = '#252525'; };
+                    parentDiv.onmouseout = function() { this.style.background = 'transparent'; };
+                    parentDiv.onclick = function() { loadDirContents(data.parent); };
+                    container.appendChild(parentDiv);
+                }
+                
+                // Directories
+                if (data.directories && data.directories.length > 0) {
+                    for (var i = 0; i < data.directories.length; i++) {
+                        (function(dir) {
+                            var dirDiv = document.createElement('div');
+                            dirDiv.style.cssText = 'padding: 10px; cursor: pointer; border-bottom: 1px solid #252525; display: flex; align-items: center;';
+                            dirDiv.innerHTML = '<span style="color: #69db7c; margin-right: 10px;">📁</span><span style="color: #ddd;">' + dir.name + '</span>';
+                            dirDiv.onmouseover = function() { this.style.background = '#252525'; };
+                            dirDiv.onmouseout = function() { this.style.background = 'transparent'; };
+                            dirDiv.onclick = function() { loadDirContents(dir.path); };
+                            container.appendChild(dirDiv);
+                        })(data.directories[i]);
+                    }
+                }
+                
+                // Files (info only)
+                if (data.files && data.files.length > 0) {
+                    var filesHeader = document.createElement('div');
+                    filesHeader.style.cssText = 'padding: 10px 10px 5px; color: #666; font-size: 0.85em; border-top: 1px solid #333; margin-top: 10px;';
+                    filesHeader.textContent = 'Files in this directory:';
+                    container.appendChild(filesHeader);
+                    
+                    var maxFiles = Math.min(data.files.length, 10);
+                    for (var i = 0; i < maxFiles; i++) {
+                        var fileDiv = document.createElement('div');
+                        fileDiv.style.cssText = 'padding: 5px 10px; color: #888; font-size: 0.9em;';
+                        fileDiv.innerHTML = '<span style="margin-right: 10px;">📄</span>' + data.files[i].name + '<span style="color: #666; margin-left: 10px;">(' + data.files[i].size_mb + ' MB)</span>';
+                        container.appendChild(fileDiv);
+                    }
+                    if (data.files.length > 10) {
+                        var moreDiv = document.createElement('div');
+                        moreDiv.style.cssText = 'padding: 5px 10px; color: #666; font-size: 0.85em;';
+                        moreDiv.textContent = '...and ' + (data.files.length - 10) + ' more files';
+                        container.appendChild(moreDiv);
+                    }
+                }
+                
+                if ((!data.directories || data.directories.length === 0) && (!data.files || data.files.length === 0)) {
+                    var emptyDiv = document.createElement('div');
+                    emptyDiv.style.cssText = 'padding: 20px; color: #666; text-align: center;';
+                    emptyDiv.textContent = 'Empty directory';
+                    container.appendChild(emptyDiv);
+                }
+            })
+            .catch(function(e) {
+                document.getElementById('dir-browser-list').innerHTML = '<div style="color: #dc3545;">Error: ' + e + '</div>';
+            });
+        }
+        
+        function selectCurrentDir() {
+            document.getElementById('import-dir').value = currentBrowsePath;
+            closeDirBrowser();
+            scanImportDir();
+        }
+        
+        function scanImportDir() {
+            var dir = document.getElementById('import-dir').value;
+            if (!dir) {
+                alert('Please enter a directory path');
+                return;
+            }
+            
+            document.getElementById('import-file-list').innerHTML = '<div style="color: #ffc107;">Scanning...</div>';
+            
+            fetch('/api/import/scan-dir', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({path: dir})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    document.getElementById('import-file-list').innerHTML = '<div style="color: #dc3545;">Error: ' + data.error + '</div>';
+                    return;
+                }
+                
+                importFiles = data.files || [];
+                renderImportFileList();
+            })
+            .catch(function(e) {
+                document.getElementById('import-file-list').innerHTML = '<div style="color: #dc3545;">Error: ' + e + '</div>';
+            });
+        }
+        
+        function renderImportFileList() {
+            var html = '';
+            if (importFiles.length === 0) {
+                html = '<div style="color: #888;">No importable files found.</div>';
+            } else {
+                for (var i = 0; i < importFiles.length; i++) {
+                    var f = importFiles[i];
+                    var typeColor = f.detected_type === 'clicker' ? '#ff6b6b' : (f.detected_type === 'opener' ? '#69db7c' : '#888');
+                    html += '<div style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #252525;">';
+                    html += '<input type="checkbox" class="import-file-cb" data-idx="' + i + '" checked style="margin-right: 10px;">';
+                    html += '<span style="flex: 1; color: #ddd;">' + f.filename + '</span>';
+                    html += '<span style="width: 80px; color: #888; text-align: right;">' + f.size_mb + ' MB</span>';
+                    html += '<span style="width: 60px; color: #888; text-align: right;">' + f.column_count + ' cols</span>';
+                    html += '<span style="width: 80px; color: ' + typeColor + '; text-align: right; text-transform: capitalize;">' + f.detected_type + '</span>';
+                    html += '</div>';
+                }
+            }
+            document.getElementById('import-file-list').innerHTML = html;
+        }
+        
+        function toggleAllImportFiles() {
+            var checked = document.getElementById('import-select-all').checked;
+            var checkboxes = document.querySelectorAll('.import-file-cb');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = checked;
+            }
+        }
+        
+        function getSelectedImportFiles() {
+            var selected = [];
+            var checkboxes = document.querySelectorAll('.import-file-cb:checked');
+            for (var i = 0; i < checkboxes.length; i++) {
+                var idx = parseInt(checkboxes[i].getAttribute('data-idx'));
+                if (importFiles[idx]) {
+                    selected.push(importFiles[idx]);
+                }
+            }
+            return selected;
+        }
+        
+        function previewSelectedFile() {
+            var selected = getSelectedImportFiles();
+            if (selected.length === 0) {
+                alert('Please select a file to preview');
+                return;
+            }
+            
+            var file = selected[0];
+            document.getElementById('import-preview-modal').style.display = 'block';
+            document.getElementById('import-preview-content').innerHTML = '<div style="color: #ffc107;">Loading preview...</div>';
+            
+            fetch('/api/import/preview', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({path: file.path, filename: file.filename})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    document.getElementById('import-preview-content').innerHTML = '<div style="color: #dc3545;">Error: ' + data.error + '</div>';
+                    return;
+                }
+                
+                var html = '<h4 style="color: #aaa;">File: ' + data.filename + ' (Type: ' + data.detected_type + ')</h4>';
+                
+                // Column mapping
+                html += '<h5 style="color: #888; margin-top: 15px;">Detected Column Mapping:</h5>';
+                html += '<div style="background: #252525; padding: 10px; border-radius: 5px; margin-bottom: 15px;">';
+                for (var field in data.column_mapping) {
+                    html += '<span style="color: #00d4ff; margin-right: 15px;">' + field + ': col ' + data.column_mapping[field] + '</span>';
+                }
+                html += '</div>';
+                
+                // Sample rows
+                html += '<h5 style="color: #888;">Sample Rows (first 10):</h5>';
+                html += '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.85em;">';
+                for (var i = 0; i < data.rows.length; i++) {
+                    html += '<tr>';
+                    for (var j = 0; j < data.rows[i].length; j++) {
+                        var val = data.rows[i][j] || '';
+                        if (val.length > 30) val = val.substring(0, 30) + '...';
+                        var bgColor = i % 2 === 0 ? '#1a1a1a' : '#252525';
+                        html += '<td style="padding: 5px 8px; border: 1px solid #333; background: ' + bgColor + '; color: #ddd;">' + val + '</td>';
+                    }
+                    html += '</tr>';
+                }
+                html += '</table></div>';
+                
+                document.getElementById('import-preview-content').innerHTML = html;
+            })
+            .catch(function(e) {
+                document.getElementById('import-preview-content').innerHTML = '<div style="color: #dc3545;">Error: ' + e + '</div>';
+            });
+        }
+        
+        function closePreviewModal() {
+            document.getElementById('import-preview-modal').style.display = 'none';
+        }
+        
+        function startImport() {
+            var selected = getSelectedImportFiles();
+            if (selected.length === 0) {
+                alert('Please select files to import');
+                return;
+            }
+            
+            var dataSource = document.getElementById('import-source').value || 'External Import';
+            
+            if (!confirm('Import ' + selected.length + ' file(s) with data source "' + dataSource + '"?\\n\\nThis will use enrichment upsert (same email = combined data).')) {
+                return;
+            }
+            
+            // Show progress section, hide start button
+            document.getElementById('import-progress-section').style.display = 'block';
+            document.getElementById('btn-start-import').style.display = 'none';
+            document.getElementById('btn-stop-import').style.display = 'inline-block';
+            document.getElementById('import-status').textContent = 'Starting...';
+            document.getElementById('import-status').style.color = '#ffc107';
+            
+            // Start import
+            fetch('/api/import/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    files: selected,
+                    data_source: dataSource
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    resetImportUI();
+                    return;
+                }
+                
+                // Start polling for status
+                importStatusInterval = setInterval(pollImportStatus, 1000);
+            })
+            .catch(function(e) {
+                alert('Error: ' + e);
+                resetImportUI();
+            });
+        }
+        
+        function pollImportStatus() {
+            fetch('/api/import/status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                updateImportProgress(data);
+                
+                if (data.status === 'complete' || data.status === 'error' || data.status === 'stopped') {
+                    clearInterval(importStatusInterval);
+                    importStatusInterval = null;
+                    
+                    document.getElementById('btn-start-import').style.display = 'inline-block';
+                    document.getElementById('btn-stop-import').style.display = 'none';
+                    
+                    if (data.status === 'complete') {
+                        document.getElementById('import-status').textContent = 'Complete!';
+                        document.getElementById('import-status').style.color = '#28a745';
+                    } else if (data.status === 'error') {
+                        document.getElementById('import-status').textContent = 'Error: ' + data.error_message;
+                        document.getElementById('import-status').style.color = '#dc3545';
+                    } else {
+                        document.getElementById('import-status').textContent = 'Stopped';
+                        document.getElementById('import-status').style.color = '#ffc107';
+                    }
+                }
+            })
+            .catch(function(e) {
+                console.error('Status poll error:', e);
+            });
+        }
+        
+        function updateImportProgress(data) {
+            document.getElementById('import-status').textContent = data.status;
+            document.getElementById('import-current-file').textContent = data.current_file || '-';
+            document.getElementById('import-file-progress').textContent = data.current_file_index + '/' + data.total_files;
+            
+            // Progress bar
+            var pct = data.total_files > 0 ? Math.round((data.current_file_index / data.total_files) * 100) : 0;
+            document.getElementById('import-progress-bar').style.width = pct + '%';
+            document.getElementById('import-progress-pct').textContent = pct + '%';
+            
+            // Stats
+            document.getElementById('import-total-processed').textContent = formatNum(data.total_records_processed);
+            document.getElementById('import-new-records').textContent = formatNum(data.total_new_records);
+            document.getElementById('import-enriched').textContent = formatNum(data.total_enriched_records);
+            document.getElementById('import-rate').textContent = formatNum(data.rate_per_second) + '/s';
+            
+            // Category breakdown
+            document.getElementById('import-big4').textContent = formatNum(data.big4_count);
+            document.getElementById('import-cable').textContent = formatNum(data.cable_count);
+            document.getElementById('import-gi-valid').textContent = formatNum(data.gi_valid_count);
+            document.getElementById('import-gi-dead').textContent = formatNum(data.gi_dead_count);
+            document.getElementById('import-gi-new').textContent = formatNum(data.gi_new_domain_count);
+            
+            // Update log panel
+            if (data.log_messages && data.log_messages.length > 0) {
+                var logDiv = document.getElementById('import-log');
+                var logHtml = '';
+                for (var i = 0; i < data.log_messages.length; i++) {
+                    var msg = data.log_messages[i];
+                    var color = '#888';
+                    if (msg.indexOf('ERROR') >= 0) color = '#dc3545';
+                    else if (msg.indexOf('Completed') >= 0) color = '#28a745';
+                    else if (msg.indexOf('Starting') >= 0) color = '#17a2b8';
+                    else if (msg.indexOf('Batch') >= 0) color = '#6c757d';
+                    logHtml += '<div style="color: ' + color + ';">' + msg + '</div>';
+                }
+                logDiv.innerHTML = logHtml;
+                logDiv.scrollTop = logDiv.scrollHeight;  // Auto-scroll to bottom
+            }
+        }
+        
+        function stopImport() {
+            if (!confirm('Stop the import? Progress will be saved.')) {
+                return;
+            }
+            
+            fetch('/api/import/stop', {method: 'POST'})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                document.getElementById('import-status').textContent = 'Stopping...';
+            });
+        }
+        
+        function resetImportUI() {
+            document.getElementById('btn-start-import').style.display = 'inline-block';
+            document.getElementById('btn-stop-import').style.display = 'none';
+            if (importStatusInterval) {
+                clearInterval(importStatusInterval);
+                importStatusInterval = null;
+            }
+        }
     </script>
 </body>
 </html>
@@ -1586,6 +2149,9 @@ def api_export():
             params.append(request.args.get('state'))
         if request.args.get('clickers') == 'true':
             where_parts.append("is_clicker = true")
+        if request.args.get('file_source'):
+            where_parts.append("%s = ANY(file_sources)")
+            params.append(request.args.get('file_source'))
         
         where_clause = " AND ".join(where_parts)
         limit = min(int(request.args.get('limit', 50000)), 100000)
@@ -2241,6 +2807,209 @@ def api_mx_dns_stats():
         return jsonify({'servers': servers})
     except Exception as e:
         return jsonify({'servers': {}, 'error': str(e)})
+
+
+# =============================================================================
+# IMPORT DATA API ENDPOINTS
+# =============================================================================
+
+# Lazy load importer module
+_importer = None
+_import_thread = None
+
+def get_importer():
+    """Lazy load importer module."""
+    global _importer
+    if _importer is None:
+        try:
+            import importer as imp
+            _importer = imp
+        except ImportError as e:
+            print(f"Importer not available: {e}")
+    return _importer
+
+
+@app.route('/api/browse-dir', methods=['POST'])
+def api_browse_dir():
+    """Browse directories for the directory picker."""
+    import os
+    from pathlib import Path
+    
+    try:
+        data = request.get_json()
+        dir_path = data.get('path', 'C:\\')
+        
+        path = Path(dir_path)
+        if not path.exists():
+            return jsonify({'error': f'Path not found: {dir_path}'})
+        
+        if not path.is_dir():
+            return jsonify({'error': f'Not a directory: {dir_path}'})
+        
+        result = {
+            'current': str(path),
+            'parent': str(path.parent) if path.parent != path else None,
+            'directories': [],
+            'files': []
+        }
+        
+        try:
+            for item in sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+                if item.name.startswith('.'):
+                    continue
+                    
+                if item.is_dir():
+                    result['directories'].append({
+                        'name': item.name,
+                        'path': str(item)
+                    })
+                elif item.suffix.lower() in ['.csv', '.txt']:
+                    try:
+                        size = item.stat().st_size
+                        result['files'].append({
+                            'name': item.name,
+                            'path': str(item),
+                            'size_mb': round(size / (1024 * 1024), 2)
+                        })
+                    except:
+                        pass
+        except PermissionError:
+            return jsonify({'error': f'Permission denied: {dir_path}'})
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/import/scan-dir', methods=['POST'])
+def api_import_scan_dir():
+    """Scan a directory for importable files."""
+    imp = get_importer()
+    if not imp:
+        return jsonify({'error': 'Importer module not available'}), 500
+    
+    try:
+        data = request.get_json()
+        dir_path = data.get('path', '')
+        
+        if not dir_path:
+            return jsonify({'error': 'No path provided'})
+        
+        files = imp.scan_directory(dir_path)
+        return jsonify({
+            'files': [f.to_dict() for f in files],
+            'count': len(files)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/import/preview', methods=['POST'])
+def api_import_preview():
+    """Preview a file with schema detection."""
+    imp = get_importer()
+    if not imp:
+        return jsonify({'error': 'Importer module not available'}), 500
+    
+    try:
+        data = request.get_json()
+        file_path = data.get('path', '')
+        
+        if not file_path:
+            return jsonify({'error': 'No path provided'})
+        
+        result = imp.preview_file(file_path)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/import/start', methods=['POST'])
+def api_import_start():
+    """Start importing files."""
+    global _import_thread
+    
+    imp = get_importer()
+    if not imp:
+        return jsonify({'error': 'Importer module not available'}), 500
+    
+    try:
+        data = request.get_json()
+        files = data.get('files', [])
+        data_source = data.get('data_source', 'External Import')
+        
+        if not files:
+            return jsonify({'error': 'No files provided'})
+        
+        # Check if already running
+        progress = imp.get_progress()
+        if progress.status == 'importing':
+            return jsonify({'error': 'Import already in progress'})
+        
+        # Start import in background thread
+        import threading
+        _import_thread = threading.Thread(
+            target=imp.import_files,
+            args=(files, data_source),
+            daemon=True
+        )
+        _import_thread.start()
+        
+        return jsonify({'status': 'started', 'file_count': len(files)})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/import/status')
+def api_import_status():
+    """Get current import status."""
+    imp = get_importer()
+    if not imp:
+        return jsonify({'error': 'Importer module not available', 'status': 'error'})
+    
+    try:
+        progress = imp.get_progress()
+        return jsonify(progress.to_dict())
+    except Exception as e:
+        return jsonify({'error': str(e), 'status': 'error'})
+
+
+@app.route('/api/import/stop', methods=['POST'])
+def api_import_stop():
+    """Stop the running import."""
+    imp = get_importer()
+    if not imp:
+        return jsonify({'error': 'Importer module not available'}), 500
+    
+    try:
+        imp.request_stop()
+        return jsonify({'status': 'stop_requested'})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/file-sources')
+def api_file_sources():
+    """Get list of unique file sources."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT DISTINCT unnest(file_sources) as filename, COUNT(*) as email_count
+            FROM emails
+            WHERE file_sources IS NOT NULL
+            GROUP BY 1
+            ORDER BY 2 DESC
+        """)
+        
+        sources = [{'filename': row[0], 'email_count': int(row[1])} for row in cursor.fetchall()]
+        
+        cursor.close()
+        conn.close()
+        return jsonify({'sources': sources, 'count': len(sources)})
+    except Exception as e:
+        return jsonify({'sources': [], 'error': str(e)})
 
 
 if __name__ == '__main__':

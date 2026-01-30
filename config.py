@@ -11,7 +11,7 @@ from pathlib import Path
 # PATHS
 # =============================================================================
 
-BASE_DIR = Path(r"c:\Users\mdbar\OneDrive\Documents\Email Data 2022")
+BASE_DIR = Path(r"C:\EmailData")
 EMAIL_PROCESSOR_DIR = BASE_DIR / "email_processor"
 LOG_DIR = BASE_DIR / "logs"
 OUTPUT_DIR = BASE_DIR / "output"
