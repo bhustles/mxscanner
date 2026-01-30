@@ -44,49 +44,56 @@ def _get_resolver(server: str, timeout: float) -> dns.resolver.Resolver:
     return _thread_local.resolvers[server]
 
 
-def resolve_mx(domain: str, timeout: float = 1.5) -> Tuple[Optional[List[tuple]], Optional[str]]:
+def resolve_mx(domain: str, timeout: float = 2.0, max_retries: int = 2) -> Tuple[Optional[List[tuple]], Optional[str]]:
     """
     Resolve MX records - LOCK-FREE, high performance.
-    Single attempt only, no retries (timeout/lifetime both = timeout).
-    1.5s timeout = reliable (1.0s was still causing false dead).
+    Retries with different DNS servers on timeout/error.
     Returns:
         Tuple of (mx_records, dns_server_used)
     """
     global _server_index
     
-    # Get next server (no lock - race condition is fine, just distributes load)
-    idx = _server_index
-    _server_index = (idx + 1) % len(DNS_SERVERS)
+    last_server = None
     
-    # Single attempt - fast fail, rescan dead later
-    server = DNS_SERVERS[idx % len(DNS_SERVERS)]
+    for attempt in range(max_retries):
+        # Get next server (no lock - race condition is fine, just distributes load)
+        idx = _server_index
+        _server_index = (idx + 1) % len(DNS_SERVERS)
+        server = DNS_SERVERS[idx % len(DNS_SERVERS)]
+        last_server = server
+        
+        try:
+            resolver = _get_resolver(server, timeout)
+            answers = resolver.resolve(domain, 'MX')
+            
+            mx_records = [(rdata.preference, str(rdata.exchange).rstrip('.')) 
+                          for rdata in answers]
+            mx_records.sort(key=lambda x: x[0])
+            return (mx_records, server)
+            
+        except dns.resolver.NXDOMAIN:
+            # Domain definitely doesn't exist - no retry needed
+            return (None, server)
+        except dns.resolver.NoAnswer:
+            # Domain exists but no MX records - no retry needed
+            return ([], server)
+        except (dns.resolver.NoNameservers, dns.exception.Timeout, Exception):
+            # Timeout or error - try next server
+            continue
     
-    try:
-        resolver = _get_resolver(server, timeout)
-        answers = resolver.resolve(domain, 'MX')
-        
-        mx_records = [(rdata.preference, str(rdata.exchange).rstrip('.')) 
-                      for rdata in answers]
-        mx_records.sort(key=lambda x: x[0])
-        return (mx_records, server)
-        
-    except dns.resolver.NXDOMAIN:
-        return (None, server)
-    except dns.resolver.NoAnswer:
-        return ([], server)
-    except (dns.resolver.NoNameservers, dns.exception.Timeout, Exception):
-        return (None, server)
+    # All retries failed
+    return (None, last_server)
 
 
 # Legacy compatibility
 class DNSPool:
     """Legacy wrapper - just calls the lock-free function."""
-    def __init__(self, servers=None, timeout=1.5):
+    def __init__(self, servers=None, timeout=2.0):
         self.timeout = timeout
         self.servers = servers or DNS_SERVERS
     
     def resolve_mx(self, domain: str):
-        return resolve_mx(domain, self.timeout)
+        return resolve_mx(domain, self.timeout, max_retries=2)
     
     def get_stats(self):
         return {'total_requests': 0, 'errors': 0, 'servers_count': len(DNS_SERVERS)}
