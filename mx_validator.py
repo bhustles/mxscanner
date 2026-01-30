@@ -868,17 +868,25 @@ def run_validation(workers: int = 16, batch_size: int = 2000, resume: bool = Tru
     _pause_event.clear()
     
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        print("Executor started, beginning batch processing...", flush=True)
-        print(f"Total batches to process: {len(range(0, len(domains), batch_size))}", flush=True)
-        # Submit in batches
-        for i in range(0, len(domains), batch_size):
-            if i == 0:
-                print(f"Processing first batch (0 to {batch_size})...", flush=True)
-            if i > 0 and i % 1000 == 0:
-                print(f"Starting batch {i}...", flush=True)
+        print("Executor started, submitting ALL domains at once for smooth processing...", flush=True)
+        
+        # Submit ALL domains at once - executor queues them internally
+        # This gives smooth continuous processing instead of chunky batches
+        futures = {
+            executor.submit(validate_domain, domain, count): (domain, count)
+            for domain, count in domains
+        }
+        print(f"Submitted {len(futures):,} domains to executor queue", flush=True)
+        
+        futures_completed = 0
+        for future in as_completed(futures):
+            futures_completed += 1
+            
             # Check for stop
             if _stop_event.is_set():
-                print(f"Stop event detected at batch {i}, exiting...", flush=True)
+                print(f"Stop event detected, cancelling remaining futures...", flush=True)
+                for f in futures:
+                    f.cancel()
                 with _state_lock:
                     _state.status = 'stopping'
                 break
@@ -889,78 +897,52 @@ def run_validation(workers: int = 16, batch_size: int = 2000, resume: bool = Tru
                     _state.status = 'paused'
                 time.sleep(0.5)
             
-            if _stop_event.is_set():
-                break
-            
             with _state_lock:
                 _state.status = 'running'
             
-            batch = domains[i:i + batch_size]
-            if i == 0:
-                print(f"First batch has {len(batch)} domains", flush=True)
-            futures = {
-                executor.submit(validate_domain, domain, count): (domain, count)
-                for domain, count in batch
-            }
-            if i == 0:
-                print(f"Submitted {len(futures)} futures, waiting for completion...", flush=True)
-            
-            futures_completed = 0
-            for future in as_completed(futures):
-                futures_completed += 1
-                if i == 0 and futures_completed == 1:
-                    print(f"First future completed!", flush=True)
-                if _stop_event.is_set():
-                    print(f"Stop event during futures processing", flush=True)
-                    break
+            domain, count = futures[future]
+            try:
+                result = future.result()
                 
-                domain, count = futures[future]
-                try:
-                    result = future.result()
+                # Debug: print first few results
+                if futures_completed <= 3:
+                    print(f"Result {futures_completed}: {result['domain']} -> {result['category']}", flush=True)
+                
+                # Save to database
+                dns_ip = result.get('dns_server')
+                dns_display = DNS_SERVER_DISPLAY.get(dns_ip, dns_ip) if dns_ip else None
+                save_mx_result(
+                    result['domain'],
+                    result['mx_records'],
+                    result['category'],
+                    result['provider'],
+                    result['email_count'],
+                    result.get('error'),
+                    dns_display
+                )
+                
+                # Update state
+                with _state_lock:
+                    _state.checked += 1
+                    email_count = result.get('email_count', 0)
+                    if result['is_valid']:
+                        _state.valid += 1
+                        _state.valid_emails += email_count
+                    else:
+                        _state.dead += 1
+                        _state.dead_emails += email_count
                     
-                    # Debug: print first few results
-                    if futures_completed <= 3:
-                        print(f"Result {futures_completed}: {result['domain']} -> {result['category']}", flush=True)
+                    # Update category counts
+                    cat = result['category']
+                    if cat in _state.categories:
+                        _state.categories[cat] += 1
+                    else:
+                        _state.categories['Other'] = _state.categories.get('Other', 0) + 1
                     
-                    # Save to database
-                    if futures_completed <= 3:
-                        print(f"  Saving result {futures_completed}...", flush=True)
-                    dns_ip = result.get('dns_server')
-                    dns_display = DNS_SERVER_DISPLAY.get(dns_ip, dns_ip) if dns_ip else None
-                    save_mx_result(
-                        result['domain'],
-                        result['mx_records'],
-                        result['category'],
-                        result['provider'],
-                        result['email_count'],
-                        result.get('error'),
-                        dns_display
-                    )
-                    if futures_completed <= 3:
-                        print(f"  Saved result {futures_completed}!", flush=True)
-                    
-                    # Update state
-                    with _state_lock:
-                        _state.checked += 1
-                        email_count = result.get('email_count', 0)
-                        if result['is_valid']:
-                            _state.valid += 1
-                            _state.valid_emails += email_count
-                        else:
-                            _state.dead += 1
-                            _state.dead_emails += email_count
-                        
-                        # Update category counts
-                        cat = result['category']
-                        if cat in _state.categories:
-                            _state.categories[cat] += 1
-                        else:
-                            _state.categories['Other'] = _state.categories.get('Other', 0) + 1
-                        
-                        checked_count = _state.checked
-                    
-                    # Log result
-                    log_result(result)
+                    checked_count = _state.checked
+                
+                # Log result
+                log_result(result)
                     
                     # Calculate rate every 100 domains
                     if checked_count % 100 == 0:
