@@ -896,6 +896,20 @@ DASHBOARD_HTML = """
             }
         }
         
+        function resetDnsStats() {
+            for (var server in dnsServerStats) {
+                dnsServerStats[server].valid = 0;
+                dnsServerStats[server].dead = 0;
+            }
+            updateDnsServerDisplay();
+            flushCount = 0;
+            totalFlushed = 0;
+            console.log('DNS stats and flush counters reset');
+        }
+        
+        // Auto-reset DNS stats on page load
+        resetDnsStats();
+        
         function addMxLog(domain, mx, category, dnsServer) {
             var terminal = document.getElementById('mx-terminal');
             var time = new Date().toLocaleTimeString();
