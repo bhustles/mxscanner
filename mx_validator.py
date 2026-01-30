@@ -577,8 +577,7 @@ def batch_apply_emails(domains_per_batch: int = 500):
 def update_emails_from_mx(batch_size: int = 100000):
     """Update emails table with MX categories from domain_mx table.
     
-    Processes domain by domain to avoid massive transactions.
-    Each domain's emails are updated in one go (usually < 100k per domain).
+    Uses a single bulk UPDATE with JOIN for maximum speed.
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -605,32 +604,24 @@ def update_emails_from_mx(batch_size: int = 100000):
     """)
     conn.commit()
     
-    # Get all domains with their MX data - process one domain at a time
+    print("Starting bulk MX update with JOIN...")
+    
+    # Single bulk UPDATE with JOIN - much faster than row-by-row
     cursor.execute("""
-        SELECT domain, mx_category, is_valid 
-        FROM domain_mx 
-        ORDER BY email_count DESC
+        UPDATE emails e
+        SET 
+            mx_category = d.mx_category,
+            mx_valid = d.is_valid
+        FROM domain_mx d
+        WHERE e.email_domain = d.domain
+          AND (e.mx_category IS DISTINCT FROM d.mx_category 
+               OR e.mx_valid IS DISTINCT FROM d.is_valid)
     """)
-    domains = cursor.fetchall()
     
-    total_updated = 0
-    processed = 0
+    total_updated = cursor.rowcount
+    conn.commit()
     
-    for domain, mx_category, is_valid in domains:
-        # Update all emails for this domain
-        cursor.execute("""
-            UPDATE emails 
-            SET mx_category = %s, mx_valid = %s
-            WHERE email_domain = %s
-              AND (mx_category IS DISTINCT FROM %s OR mx_valid IS DISTINCT FROM %s)
-        """, (mx_category, is_valid, domain, mx_category, is_valid))
-        
-        total_updated += cursor.rowcount
-        conn.commit()  # Commit after each domain to release locks
-        
-        processed += 1
-        if processed % 1000 == 0:
-            print(f"Processed {processed}/{len(domains)} domains, {total_updated:,} emails updated")
+    print(f"Bulk update complete: {total_updated:,} emails updated")
     
     cursor.close()
     conn.close()

@@ -37,6 +37,17 @@ DATABASE = {
 DB_CONNECTION_STRING = f"host={DATABASE['host']} port={DATABASE['port']} dbname={DATABASE['database']} user={DATABASE['user']} password={DATABASE['password']}"
 
 # =============================================================================
+# BLOCKED DOMAINS - Skip on import, auto-purged
+# =============================================================================
+
+BLOCKED_DOMAINS = {
+    'example.com',      # Test/placeholder domain
+    'test.com',         # Test domain
+    'asdf.com',         # Junk domain
+    'amazon.com',       # Corporate - not consumer emails
+}
+
+# =============================================================================
 # PROCESSING SETTINGS
 # =============================================================================
 

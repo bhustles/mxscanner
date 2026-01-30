@@ -249,71 +249,237 @@ DASHBOARD_HTML = """
         <!-- STATS TAB -->
         <div id="tab-stats" class="tab-content">
         
-        <!-- Stats Cards (auto-refresh) -->
-        <p style="color: #666; font-size: 0.85em; margin-bottom: 8px;">Auto-refresh every 2s | Last updated: <span id="stats-updated">-</span> | Count goes up as the pipeline loads (commits per file)</p>
-        <div class="stats-grid" id="stats-cards">
-            <div class="stat-card">
-                <h3>Total Emails</h3>
-                <div class="value" id="stat-total">{{ "{:,}".format(stats.total) }}</div>
-            </div>
-            <div class="stat-card">
-                <h3>Big 4 ISPs</h3>
-                <div class="value" id="stat-big4">{{ "{:,}".format(stats.big4) }}</div>
-                <div class="sub" id="stat-big4-pct">{{ "%.1f"|format(stats.big4 / stats.total * 100 if stats.total else 0) }}%</div>
-            </div>
-            <div class="stat-card">
-                <h3>Cable Providers</h3>
-                <div class="value" id="stat-cable">{{ "{:,}".format(stats.cable) }}</div>
-                <div class="sub" id="stat-cable-pct">{{ "%.1f"|format(stats.cable / stats.total * 100 if stats.total else 0) }}%</div>
-            </div>
-            <div class="stat-card">
-                <h3>General Internet</h3>
-                <div class="value" id="stat-gi">{{ "{:,}".format(stats.gi) }}</div>
-                <div class="sub" id="stat-gi-pct">{{ "%.1f"|format(stats.gi / stats.total * 100 if stats.total else 0) }}%</div>
-            </div>
-            <div class="stat-card">
-                <h3>Clickers</h3>
-                <div class="value" id="stat-clickers">{{ "{:,}".format(stats.clickers) }}</div>
-            </div>
-            <div class="stat-card">
-                <h3>High Quality (80+)</h3>
-                <div class="value" id="stat-high-quality">{{ "{:,}".format(stats.high_quality) }}</div>
-            </div>
+        <p style="color: #666; font-size: 0.85em; margin-bottom: 12px;">
+            Cache updated: <span id="stats-updated">-</span> | 
+            <button onclick="loadDetailedStats()" style="font-size: 12px; padding: 2px 8px;">Load Cached Stats</button>
+            <button onclick="recalculateStats()" style="font-size: 12px; padding: 2px 8px; margin-left: 5px; background: #fd7e14;">Recalculate (slow)</button>
+            <span id="stats-loading" style="display:none; color: #ffc107; margin-left: 10px;">Loading...</span>
+        </p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        
+        <!-- LEFT COLUMN -->
+        <div>
+        
+        <!-- MASTER STATS TABLE -->
+        <div class="section" style="padding: 12px;">
+            <h3 style="color: #00d4ff; margin: 0 0 10px 0; font-size: 14px;">Category Totals</h3>
+            <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                <tr style="border-bottom: 2px solid #444;">
+                    <td style="font-weight: bold; padding: 4px 0;">Category</td>
+                    <td style="text-align: right; font-weight: bold; padding: 4px 8px;">Total</td>
+                    <td style="text-align: right; font-weight: bold; color: #28a745; padding: 4px 8px;">Good</td>
+                    <td style="text-align: right; font-weight: bold; color: #dc3545; padding: 4px 8px;">Dead</td>
+                    <td style="text-align: right; font-weight: bold; color: #e83e8c; padding: 4px 8px;">Clickers</td>
+                    <td style="text-align: right; font-weight: bold; color: #17a2b8; padding: 4px 8px;">Openers</td>
+                </tr>
+                <tr style="background: #1a1a1a; border-bottom: 1px solid #333;">
+                    <td style="font-weight: bold; padding: 6px 0;">TOTAL</td>
+                    <td style="text-align: right; font-weight: bold; padding: 6px 8px;" id="stat-total">-</td>
+                    <td style="text-align: right; color: #28a745; padding: 6px 8px;" id="stat-good-total">-</td>
+                    <td style="text-align: right; color: #dc3545; padding: 6px 8px;" id="stat-dead-total">-</td>
+                    <td style="text-align: right; padding: 6px 8px;" id="stat-clickers">-</td>
+                    <td style="text-align: right; padding: 6px 8px;" id="stat-openers">-</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #333;">
+                    <td style="color: #ffc107; padding: 4px 0;">Big4 ISPs</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-big4-total">-</td>
+                    <td style="text-align: right; color: #28a745; padding: 4px 8px;" id="stat-big4-good">-</td>
+                    <td style="text-align: right; color: #dc3545; padding: 4px 8px;" id="stat-big4-dead">-</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-clickers-big4">-</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-openers-big4">-</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #333;">
+                    <td style="color: #17a2b8; padding: 4px 0;">2nd Level Big4</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-2nd-big4-total">-</td>
+                    <td style="text-align: right; color: #28a745; padding: 4px 8px;" id="stat-2nd-big4-good">-</td>
+                    <td style="text-align: right; color: #dc3545; padding: 4px 8px;" id="stat-2nd-big4-dead">-</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-2nd-big4-clickers">-</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-2nd-big4-openers">-</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #333;">
+                    <td style="color: #6f42c1; padding: 4px 0;">Cable Providers</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-cable-total">-</td>
+                    <td style="text-align: right; color: #28a745; padding: 4px 8px;" id="stat-cable-good">-</td>
+                    <td style="text-align: right; color: #dc3545; padding: 4px 8px;" id="stat-cable-dead">-</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-clickers-cable">-</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-openers-cable">-</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #333;">
+                    <td style="color: #20c997; padding: 4px 0;">General Internet</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-gi-total">-</td>
+                    <td style="text-align: right; color: #28a745; padding: 4px 8px;" id="stat-gi-good">-</td>
+                    <td style="text-align: right; color: #dc3545; padding: 4px 8px;" id="stat-gi-dead">-</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-clickers-gi">-</td>
+                    <td style="text-align: right; padding: 4px 8px;" id="stat-openers-gi">-</td>
+                </tr>
+            </table>
         </div>
         
-        <!-- Provider Distribution (auto-refresh) -->
-        <div class="section" id="providers-section">
-            <h2>By Email Provider</h2>
-            <div id="providers-content">
-                {% for provider, count in providers[:10] %}
-                <div style="margin: 10px 0;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>{{ provider or 'Unknown' }}</span>
-                        <span>{{ "{:,}".format(count) }}</span>
-                    </div>
-                    <div class="bar">
-                        <div class="bar-fill" style="width: {{ (count / stats.total * 100) if stats.total else 0 }}%"></div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
+        <!-- BIG 4 BREAKDOWN -->
+        <div class="section" style="padding: 12px;">
+            <h3 style="color: #ffc107; margin: 0 0 10px 0; font-size: 14px;">Big 4 Breakdown</h3>
+            <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid #444;">
+                    <td style="font-weight: bold; padding: 3px 0;">Provider</td>
+                    <td style="text-align: right; font-weight: bold; padding: 3px 3px;">Total</td>
+                    <td style="text-align: right; font-weight: bold; color: #28a745; padding: 3px 3px;">Good</td>
+                    <td style="text-align: right; font-weight: bold; color: #dc3545; padding: 3px 3px;">Dead</td>
+                    <td style="text-align: right; font-weight: bold; color: #00d4ff; padding: 3px 3px;">High</td>
+                    <td style="text-align: right; font-weight: bold; color: #ffc107; padding: 3px 3px;">Med</td>
+                    <td style="text-align: right; font-weight: bold; color: #6c757d; padding: 3px 3px;">Low</td>
+                    <td style="text-align: right; font-weight: bold; color: #e83e8c; padding: 3px 3px;">Click</td>
+                    <td style="text-align: right; font-weight: bold; color: #17a2b8; padding: 3px 3px;">Open</td>
+                    <td style="text-align: right; font-weight: bold; color: #888; padding: 3px 3px;">Doms</td>
+                </tr>
+                <tr><td>Gmail</td><td style="text-align: right;" id="stat-gmail">-</td><td style="text-align: right; color: #28a745;" id="stat-gmail-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-gmail-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-gmail-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-gmail-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-gmail-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-gmail-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-gmail-open">-</td><td style="text-align: right; color: #888;" id="stat-gmail-domains">-</td></tr>
+                <tr><td>Yahoo</td><td style="text-align: right;" id="stat-yahoo">-</td><td style="text-align: right; color: #28a745;" id="stat-yahoo-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-yahoo-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-yahoo-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-yahoo-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-yahoo-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-yahoo-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-yahoo-open">-</td><td style="text-align: right; color: #888;" id="stat-yahoo-domains">-</td></tr>
+                <tr><td>Outlook</td><td style="text-align: right;" id="stat-outlook">-</td><td style="text-align: right; color: #28a745;" id="stat-outlook-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-outlook-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-outlook-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-outlook-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-outlook-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-outlook-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-outlook-open">-</td><td style="text-align: right; color: #888;" id="stat-outlook-domains">-</td></tr>
+            </table>
         </div>
         
-        <!-- Quality Distribution (auto-refresh) -->
-        <div class="section" id="quality-section">
-            <h2>Quality Score Distribution</h2>
-            <div id="quality-content">
-                {% for tier, count in quality %}
-                <div style="margin: 10px 0;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>{{ tier }}</span>
-                        <span>{{ "{:,}".format(count) }} ({{ "%.1f"|format(count / stats.total * 100 if stats.total else 0) }}%)</span>
-                    </div>
-                    <div class="bar">
-                        <div class="bar-fill" style="width: {{ (count / stats.total * 100) if stats.total else 0 }}%"></div>
-                    </div>
+        <!-- CABLE PROVIDER BREAKDOWN -->
+        <div class="section" style="padding: 12px;">
+            <h3 style="color: #6f42c1; margin: 0 0 10px 0; font-size: 14px;">Cable Provider Breakdown</h3>
+            <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid #444;">
+                    <td style="font-weight: bold; padding: 3px 0;">Provider</td>
+                    <td style="text-align: right; font-weight: bold; padding: 3px 3px;">Total</td>
+                    <td style="text-align: right; font-weight: bold; color: #28a745; padding: 3px 3px;">Good</td>
+                    <td style="text-align: right; font-weight: bold; color: #dc3545; padding: 3px 3px;">Dead</td>
+                    <td style="text-align: right; font-weight: bold; color: #00d4ff; padding: 3px 3px;">High</td>
+                    <td style="text-align: right; font-weight: bold; color: #ffc107; padding: 3px 3px;">Med</td>
+                    <td style="text-align: right; font-weight: bold; color: #6c757d; padding: 3px 3px;">Low</td>
+                    <td style="text-align: right; font-weight: bold; color: #e83e8c; padding: 3px 3px;">Click</td>
+                    <td style="text-align: right; font-weight: bold; color: #17a2b8; padding: 3px 3px;">Open</td>
+                    <td style="text-align: right; font-weight: bold; color: #888; padding: 3px 3px;">Doms</td>
+                </tr>
+                <tr><td>Comcast</td><td style="text-align: right;" id="stat-comcast">-</td><td style="text-align: right; color: #28a745;" id="stat-comcast-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-comcast-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-comcast-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-comcast-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-comcast-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-comcast-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-comcast-open">-</td><td style="text-align: right; color: #888;" id="stat-comcast-domains">-</td></tr>
+                <tr><td>Spectrum/RR</td><td style="text-align: right;" id="stat-spectrum">-</td><td style="text-align: right; color: #28a745;" id="stat-spectrum-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-spectrum-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-spectrum-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-spectrum-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-spectrum-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-spectrum-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-spectrum-open">-</td><td style="text-align: right; color: #888;" id="stat-spectrum-domains">-</td></tr>
+                <tr><td>CenturyLink</td><td style="text-align: right;" id="stat-centurylink">-</td><td style="text-align: right; color: #28a745;" id="stat-centurylink-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-centurylink-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-centurylink-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-centurylink-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-centurylink-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-centurylink-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-centurylink-open">-</td><td style="text-align: right; color: #888;" id="stat-centurylink-domains">-</td></tr>
+                <tr><td>EarthLink</td><td style="text-align: right;" id="stat-earthlink">-</td><td style="text-align: right; color: #28a745;" id="stat-earthlink-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-earthlink-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-earthlink-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-earthlink-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-earthlink-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-earthlink-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-earthlink-open">-</td><td style="text-align: right; color: #888;" id="stat-earthlink-domains">-</td></tr>
+                <tr><td>Windstream</td><td style="text-align: right;" id="stat-windstream">-</td><td style="text-align: right; color: #28a745;" id="stat-windstream-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-windstream-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-windstream-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-windstream-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-windstream-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-windstream-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-windstream-open">-</td><td style="text-align: right; color: #888;" id="stat-windstream-domains">-</td></tr>
+                <tr><td>Optimum</td><td style="text-align: right;" id="stat-optimum">-</td><td style="text-align: right; color: #28a745;" id="stat-optimum-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-optimum-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-optimum-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-optimum-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-optimum-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-optimum-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-optimum-open">-</td><td style="text-align: right; color: #888;" id="stat-optimum-domains">-</td></tr>
+            </table>
+        </div>
+        
+        <!-- 2ND LEVEL BIG4 BREAKDOWN -->
+        <div class="section" style="padding: 12px;">
+            <h3 style="color: #17a2b8; margin: 0 0 10px 0; font-size: 14px;">2nd Level Big4 (GI on Big4 MX)</h3>
+            <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid #444;">
+                    <td style="font-weight: bold; padding: 3px 0;">Provider</td>
+                    <td style="text-align: right; font-weight: bold; padding: 3px 3px;">Total</td>
+                    <td style="text-align: right; font-weight: bold; color: #28a745; padding: 3px 3px;">Good</td>
+                    <td style="text-align: right; font-weight: bold; color: #dc3545; padding: 3px 3px;">Dead</td>
+                    <td style="text-align: right; font-weight: bold; color: #00d4ff; padding: 3px 3px;">High</td>
+                    <td style="text-align: right; font-weight: bold; color: #ffc107; padding: 3px 3px;">Med</td>
+                    <td style="text-align: right; font-weight: bold; color: #6c757d; padding: 3px 3px;">Low</td>
+                    <td style="text-align: right; font-weight: bold; color: #e83e8c; padding: 3px 3px;">Click</td>
+                    <td style="text-align: right; font-weight: bold; color: #17a2b8; padding: 3px 3px;">Open</td>
+                    <td style="text-align: right; font-weight: bold; color: #888; padding: 3px 3px;">Doms</td>
+                </tr>
+                <tr><td>Google</td><td style="text-align: right;" id="stat-google-hosted">-</td><td style="text-align: right; color: #28a745;" id="stat-google-hosted-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-google-hosted-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-google-hosted-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-google-hosted-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-google-hosted-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-google-hosted-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-google-hosted-open">-</td><td style="text-align: right; color: #888;" id="stat-google-hosted-domains">-</td></tr>
+                <tr><td>Microsoft</td><td style="text-align: right;" id="stat-microsoft-hosted">-</td><td style="text-align: right; color: #28a745;" id="stat-microsoft-hosted-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-microsoft-hosted-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-microsoft-hosted-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-microsoft-hosted-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-microsoft-hosted-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-microsoft-hosted-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-microsoft-hosted-open">-</td><td style="text-align: right; color: #888;" id="stat-microsoft-hosted-domains">-</td></tr>
+                <tr><td>Yahoo</td><td style="text-align: right;" id="stat-yahoo-hosted">-</td><td style="text-align: right; color: #28a745;" id="stat-yahoo-hosted-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-yahoo-hosted-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-yahoo-hosted-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-yahoo-hosted-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-yahoo-hosted-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-yahoo-hosted-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-yahoo-hosted-open">-</td><td style="text-align: right; color: #888;" id="stat-yahoo-hosted-domains">-</td></tr>
+            </table>
+        </div>
+        
+        </div><!-- END LEFT COLUMN -->
+        
+        <!-- RIGHT COLUMN -->
+        <div>
+        
+        <!-- GI HOSTING PROVIDERS BREAKDOWN -->
+        <div class="section" style="padding: 12px;">
+            <h3 style="color: #fd7e14; margin: 0 0 10px 0; font-size: 14px;">GI Hosting Breakdown (by MX)</h3>
+            <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid #444;">
+                    <td style="font-weight: bold; padding: 3px 0;">Provider</td>
+                    <td style="text-align: right; font-weight: bold; padding: 3px 3px;">Total</td>
+                    <td style="text-align: right; font-weight: bold; color: #28a745; padding: 3px 3px;">Good</td>
+                    <td style="text-align: right; font-weight: bold; color: #dc3545; padding: 3px 3px;">Dead</td>
+                    <td style="text-align: right; font-weight: bold; color: #00d4ff; padding: 3px 3px;">High</td>
+                    <td style="text-align: right; font-weight: bold; color: #ffc107; padding: 3px 3px;">Med</td>
+                    <td style="text-align: right; font-weight: bold; color: #6c757d; padding: 3px 3px;">Low</td>
+                    <td style="text-align: right; font-weight: bold; color: #e83e8c; padding: 3px 3px;">Click</td>
+                    <td style="text-align: right; font-weight: bold; color: #17a2b8; padding: 3px 3px;">Open</td>
+                    <td style="text-align: right; font-weight: bold; color: #888; padding: 3px 3px;">Doms</td>
+                </tr>
+                <tr style="background: #1a1a2e;"><td style="font-weight: bold;">Apple</td><td style="text-align: right;" id="stat-apple">-</td><td style="text-align: right; color: #28a745;" id="stat-apple-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-apple-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-apple-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-apple-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-apple-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-apple-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-apple-open">-</td><td style="text-align: right; color: #888;" id="stat-apple-domains">3</td></tr>
+                <tr><td>GoDaddy</td><td style="text-align: right;" id="stat-godaddy">-</td><td style="text-align: right; color: #28a745;" id="stat-godaddy-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-godaddy-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-godaddy-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-godaddy-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-godaddy-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-godaddy-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-godaddy-open">-</td><td style="text-align: right; color: #888;" id="stat-godaddy-domains">-</td></tr>
+                <tr><td>1&1/IONOS</td><td style="text-align: right;" id="stat-1and1">-</td><td style="text-align: right; color: #28a745;" id="stat-1and1-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-1and1-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-1and1-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-1and1-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-1and1-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-1and1-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-1and1-open">-</td><td style="text-align: right; color: #888;" id="stat-1and1-domains">-</td></tr>
+                <tr><td>HostGator</td><td style="text-align: right;" id="stat-hostgator">-</td><td style="text-align: right; color: #28a745;" id="stat-hostgator-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-hostgator-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-hostgator-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-hostgator-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-hostgator-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-hostgator-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-hostgator-open">-</td><td style="text-align: right; color: #888;" id="stat-hostgator-domains">-</td></tr>
+                <tr><td>Namecheap</td><td style="text-align: right;" id="stat-namecheap">-</td><td style="text-align: right; color: #28a745;" id="stat-namecheap-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-namecheap-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-namecheap-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-namecheap-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-namecheap-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-namecheap-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-namecheap-open">-</td><td style="text-align: right; color: #888;" id="stat-namecheap-domains">-</td></tr>
+                <tr><td>Zoho</td><td style="text-align: right;" id="stat-zoho">-</td><td style="text-align: right; color: #28a745;" id="stat-zoho-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-zoho-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-zoho-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-zoho-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-zoho-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-zoho-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-zoho-open">-</td><td style="text-align: right; color: #888;" id="stat-zoho-domains">-</td></tr>
+                <tr><td>Fastmail</td><td style="text-align: right;" id="stat-fastmail">-</td><td style="text-align: right; color: #28a745;" id="stat-fastmail-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-fastmail-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-fastmail-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-fastmail-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-fastmail-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-fastmail-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-fastmail-open">-</td><td style="text-align: right; color: #888;" id="stat-fastmail-domains">-</td></tr>
+                <tr><td>Amazon SES</td><td style="text-align: right;" id="stat-amazonses">-</td><td style="text-align: right; color: #28a745;" id="stat-amazonses-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-amazonses-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-amazonses-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-amazonses-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-amazonses-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-amazonses-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-amazonses-open">-</td><td style="text-align: right; color: #888;" id="stat-amazonses-domains">-</td></tr>
+                <tr><td>ProtonMail</td><td style="text-align: right;" id="stat-protonmail">-</td><td style="text-align: right; color: #28a745;" id="stat-protonmail-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-protonmail-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-protonmail-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-protonmail-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-protonmail-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-protonmail-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-protonmail-open">-</td><td style="text-align: right; color: #888;" id="stat-protonmail-domains">-</td></tr>
+                <tr><td>Cloudflare</td><td style="text-align: right;" id="stat-cloudflare">-</td><td style="text-align: right; color: #28a745;" id="stat-cloudflare-good">-</td><td style="text-align: right; color: #dc3545;" id="stat-cloudflare-dead">-</td><td style="text-align: right; color: #00d4ff;" id="stat-cloudflare-high">-</td><td style="text-align: right; color: #ffc107;" id="stat-cloudflare-med">-</td><td style="text-align: right; color: #6c757d;" id="stat-cloudflare-low">-</td><td style="text-align: right; color: #e83e8c;" id="stat-cloudflare-click">-</td><td style="text-align: right; color: #17a2b8;" id="stat-cloudflare-open">-</td><td style="text-align: right; color: #888;" id="stat-cloudflare-domains">-</td></tr>
+                <tr style="border-top: 1px solid #444;"><td style="padding-top: 6px;">GI Unique Domains</td><td colspan="9" style="text-align: right; padding-top: 6px;" id="stat-gi-domains">-</td></tr>
+            </table>
+        </div>
+        
+        <!-- TOP 10 GI DOMAINS -->
+        <div class="section" style="padding: 12px;">
+            <h3 style="color: #20c997; margin: 0 0 10px 0; font-size: 14px;">Top 10 GI Domains (by volume)</h3>
+            <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid #444;">
+                    <td style="font-weight: bold; padding: 3px 0;">Domain</td>
+                    <td style="text-align: right; font-weight: bold; padding: 3px 3px;">Total</td>
+                    <td style="text-align: right; font-weight: bold; color: #28a745; padding: 3px 3px;">Good</td>
+                    <td style="text-align: right; font-weight: bold; color: #dc3545; padding: 3px 3px;">Dead</td>
+                    <td style="text-align: right; font-weight: bold; color: #00d4ff; padding: 3px 3px;">High</td>
+                    <td style="text-align: right; font-weight: bold; color: #ffc107; padding: 3px 3px;">Med</td>
+                    <td style="text-align: right; font-weight: bold; color: #6c757d; padding: 3px 3px;">Low</td>
+                    <td style="text-align: right; font-weight: bold; color: #e83e8c; padding: 3px 3px;">Click</td>
+                    <td style="text-align: right; font-weight: bold; color: #17a2b8; padding: 3px 3px;">Open</td>
+                </tr>
+                <tbody id="top-gi-domains-body">
+                    <tr><td colspan="9" style="text-align: center; color: #666; padding: 10px;">Click "Recalculate" to load</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        </div><!-- END RIGHT COLUMN -->
+        
+        </div><!-- END GRID -->
+        
+        <!-- INTENT SCORE KEY -->
+        <div style="margin-top: 20px; padding: 12px; background: #1a1a2e; border-radius: 6px; border: 1px solid #333;">
+            <h4 style="color: #00d4ff; margin: 0 0 10px 0; font-size: 13px;">Intent Score Key</h4>
+            <div style="display: flex; gap: 30px; font-size: 11px; margin-bottom: 12px;">
+                <div><span style="color: #00d4ff; font-weight: bold;">High (70-100)</span> - Premium quality, verified, engaged</div>
+                <div><span style="color: #ffc107; font-weight: bold;">Med (40-69)</span> - Moderate quality, some engagement</div>
+                <div><span style="color: #6c757d; font-weight: bold;">Low (0-39)</span> - Low quality, unverified, or no score</div>
+            </div>
+            
+            <h4 style="color: #888; margin: 10px 0 8px 0; font-size: 12px; border-top: 1px solid #333; padding-top: 10px;">Quality Weighting System</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 11px; color: #aaa;">
+                <div>
+                    <div style="color: #28a745; font-weight: bold; margin-bottom: 5px;">Positive Signals (+points)</div>
+                    <div>+20 - Has clicked (is_clicker)</div>
+                    <div>+15 - Has opened (is_opener)</div>
+                    <div>+10 - Has full name (first + last)</div>
+                    <div>+10 - Has phone number</div>
+                    <div>+10 - Has physical address</div>
+                    <div>+10 - Has date of birth</div>
+                    <div>+5 - Has city/state/zip</div>
+                    <div>+5 - Has signup date</div>
+                    <div>+5 - Big4/Cable domain (deliverable)</div>
                 </div>
-                {% endfor %}
+                <div>
+                    <div style="color: #dc3545; font-weight: bold; margin-bottom: 5px;">Negative Signals (-points)</div>
+                    <div>-30 - Dead/No MX (undeliverable)</div>
+                    <div>-20 - Invalid email format</div>
+                    <div>-15 - Disposable/temp domain</div>
+                    <div>-10 - Role-based (info@, admin@)</div>
+                    <div>-10 - Missing all PII data</div>
+                    <div>-5 - Unknown/unverified domain</div>
+                </div>
+            </div>
+            <div style="margin-top: 10px; font-size: 10px; color: #666;">
+                Note: Scores are imported from source files. Max score = 100. Emails with engagement (clickers/openers) receive highest weight.
             </div>
         </div>
         
@@ -324,86 +490,215 @@ DASHBOARD_HTML = """
         
         <!-- Query Tool -->
         <div class="section">
-            <h2>Query Tool</h2>
-            <div class="filters">
-                <div class="filter-group">
-                    <label>Provider</label>
-                    <select id="provider">
-                        <option value="">All</option>
-                        <optgroup label="Big 4 ISPs">
-                            <option value="Yahoo">Yahoo</option>
-                            <option value="Google">Google</option>
-                            <option value="Microsoft">Microsoft</option>
-                        </optgroup>
-                        <optgroup label="Cable/Telecom">
-                            <option value="Comcast">Comcast/Xfinity</option>
-                            <option value="AT&T">AT&T</option>
-                            <option value="Charter">Charter/Spectrum</option>
-                            <option value="Spectrum">Spectrum/Roadrunner</option>
-                            <option value="CenturyLink">CenturyLink</option>
-                            <option value="Altice">Altice/Optimum</option>
-                            <option value="Apple">Apple/iCloud</option>
-                            <option value="EarthLink">EarthLink</option>
-                            <option value="Windstream">Windstream</option>
-                            <option value="Mediacom">Mediacom</option>
-                            <option value="Juno">Juno</option>
-                            <option value="NetZero">NetZero</option>
-                        </optgroup>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Category</label>
-                    <select id="category">
-                        <option value="">All</option>
-                        <option value="Big4_ISP">Big 4 ISP</option>
-                        <option value="Cable_Provider">Cable Provider</option>
-                        <option value="General_Internet">General Internet</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Domain Search</label>
-                    <input type="text" id="domain" placeholder="e.g. gmail.com" style="width: 120px;">
-                </div>
-                <div class="filter-group">
-                    <label>Min Quality</label>
-                    <select id="min_score">
-                        <option value="">Any</option>
-                        <option value="80">High (80+)</option>
-                        <option value="60">Good (60+)</option>
-                        <option value="40">Average (40+)</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>State</label>
-                    <input type="text" id="state" placeholder="e.g. FL" maxlength="2" style="width: 60px;">
-                </div>
-                <div class="filter-group">
-                    <label>Clickers Only</label>
-                    <select id="clickers">
-                        <option value="">No</option>
-                        <option value="true">Yes</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Source File</label>
-                    <select id="file_source" style="max-width: 180px;">
-                        <option value="">All Files</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Per Page</label>
-                    <select id="limit">
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                        <option value="500" selected>500</option>
-                        <option value="1000">1000</option>
-                        <option value="2500">2500</option>
-                        <option value="5000">5000</option>
-                    </select>
+            <h2>Query Tool - Advanced Search</h2>
+            
+            <!-- BASIC FILTERS (Always Visible) -->
+            <div class="filter-section">
+                <h4 style="color: #00d4ff; margin: 0 0 10px 0; border-bottom: 1px solid #333; padding-bottom: 5px;">Basic Filters</h4>
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Email Search</label>
+                        <input type="text" id="email_search" placeholder="email or partial" style="width: 150px;">
+                    </div>
+                    <div class="filter-group">
+                        <label>Provider</label>
+                        <select id="provider">
+                            <option value="">All</option>
+                            <optgroup label="Big 4 ISPs">
+                                <option value="Yahoo">Yahoo</option>
+                                <option value="Google">Google</option>
+                                <option value="Microsoft">Microsoft</option>
+                            </optgroup>
+                            <optgroup label="Cable/Telecom">
+                                <option value="Comcast">Comcast/Xfinity</option>
+                                <option value="AT&T">AT&T</option>
+                                <option value="Charter">Charter/Spectrum</option>
+                                <option value="Spectrum">Spectrum/Roadrunner</option>
+                                <option value="CenturyLink">CenturyLink</option>
+                                <option value="Altice">Altice/Optimum</option>
+                                <option value="Apple">Apple/iCloud</option>
+                                <option value="EarthLink">EarthLink</option>
+                                <option value="Windstream">Windstream</option>
+                                <option value="Mediacom">Mediacom</option>
+                                <option value="Juno">Juno</option>
+                                <option value="NetZero">NetZero</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Category</label>
+                        <select id="category">
+                            <option value="">All</option>
+                            <option value="Big4_ISP">Big 4 ISP</option>
+                            <option value="Cable_Provider">Cable Provider</option>
+                            <option value="General_Internet">General Internet</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Domain</label>
+                        <input type="text" id="domain" placeholder="e.g. gmail.com" style="width: 120px;">
+                    </div>
+                    <div class="filter-group">
+                        <label>State</label>
+                        <select id="state">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Per Page</label>
+                        <select id="limit">
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="500" selected>500</option>
+                            <option value="1000">1000</option>
+                            <option value="2500">2500</option>
+                            <option value="5000">5000</option>
+                        </select>
+                    </div>
                 </div>
             </div>
-            <button onclick="runQuery(1)">Search</button>
-            <button onclick="exportCSV()" style="background: #28a745;">Export CSV</button>
+            
+            <!-- PERSONAL INFO (Collapsible) -->
+            <div class="filter-section">
+                <h4 style="color: #ffc107; margin: 10px 0; cursor: pointer; border-bottom: 1px solid #333; padding-bottom: 5px;" onclick="toggleFilterSection('personal-filters')">
+                    Personal Info <span id="personal-filters-toggle" style="float: right;">+</span>
+                </h4>
+                <div id="personal-filters" class="filters" style="display: none;">
+                    <div class="filter-group">
+                        <label>First Name</label>
+                        <input type="text" id="first_name" placeholder="John" style="width: 100px;">
+                    </div>
+                    <div class="filter-group">
+                        <label>Last Name</label>
+                        <input type="text" id="last_name" placeholder="Smith" style="width: 100px;">
+                    </div>
+                    <div class="filter-group">
+                        <label>City</label>
+                        <select id="city" style="max-width: 180px;">
+                            <option value="">All Cities</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Zipcode</label>
+                        <select id="zipcode" style="max-width: 120px;">
+                            <option value="">All Zips</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Gender</label>
+                        <select id="gender">
+                            <option value="">Any</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Country</label>
+                        <select id="country">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Has Phone</label>
+                        <select id="has_phone">
+                            <option value="">Any</option>
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Has DOB</label>
+                        <select id="has_dob">
+                            <option value="">Any</option>
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ENGAGEMENT (Collapsible) -->
+            <div class="filter-section">
+                <h4 style="color: #28a745; margin: 10px 0; cursor: pointer; border-bottom: 1px solid #333; padding-bottom: 5px;" onclick="toggleFilterSection('engagement-filters')">
+                    Engagement <span id="engagement-filters-toggle" style="float: right;">+</span>
+                </h4>
+                <div id="engagement-filters" class="filters" style="display: none;">
+                    <div class="filter-group">
+                        <label>Is Clicker</label>
+                        <select id="clickers">
+                            <option value="">Any</option>
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Is Opener</label>
+                        <select id="openers">
+                            <option value="">Any</option>
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Quality Tier</label>
+                        <select id="quality_tier">
+                            <option value="">Any</option>
+                            <option value="high">High (70-100)</option>
+                            <option value="mid">Mid (40-69)</option>
+                            <option value="low">Low (0-39)</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Validation Status</label>
+                        <select id="validation_status">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SOURCE TRACKING (Collapsible) -->
+            <div class="filter-section">
+                <h4 style="color: #17a2b8; margin: 10px 0; cursor: pointer; border-bottom: 1px solid #333; padding-bottom: 5px;" onclick="toggleFilterSection('source-filters')">
+                    Source Tracking <span id="source-filters-toggle" style="float: right;">+</span>
+                </h4>
+                <div id="source-filters" class="filters" style="display: none;">
+                    <div class="filter-group">
+                        <label>Data Source</label>
+                        <select id="data_source" style="max-width: 180px;">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>File Source</label>
+                        <select id="file_source" style="max-width: 180px;">
+                            <option value="">All Files</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Signup Domain</label>
+                        <input type="text" id="signup_domain" placeholder="example.com" style="width: 120px;">
+                    </div>
+                    <div class="filter-group">
+                        <label>Signup IP</label>
+                        <input type="text" id="signup_ip" placeholder="192.168.x.x" style="width: 120px;">
+                    </div>
+                    <div class="filter-group">
+                        <label>Signup After</label>
+                        <input type="date" id="signup_date_from" style="width: 130px;">
+                    </div>
+                    <div class="filter-group">
+                        <label>Signup Before</label>
+                        <input type="date" id="signup_date_to" style="width: 130px;">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div style="margin-top: 15px;">
+                <button onclick="runQuery(1)">Search</button>
+                <button onclick="clearAllFilters()" style="background: #6c757d;">Clear Filters</button>
+                <button onclick="exportCSV()" style="background: #28a745;">Export CSV</button>
+                <span id="result-count" style="margin-left: 20px; color: #888;"></span>
+            </div>
             
             <!-- Pagination controls -->
             <div id="pagination" style="margin-top: 15px; display: none;">
@@ -485,7 +780,7 @@ DASHBOARD_HTML = """
                 </select>
                 <button type="button" class="btn-start" id="mx-start-btn" onclick="startMxScan()">Start Scan</button>
                 <button type="button" style="background: #ffc107; color: #000;" id="mx-reset-dead-only-btn" onclick="resetDeadOnly()" title="Reset dead domains to unchecked (no scan)">Reset dead only</button>
-                <button type="button" style="background: #6f42c1;" id="mx-sync-gi-btn" onclick="syncGiDomains()" title="Sync is_gi flag with emails table (finds missing GI domains)">Sync GI Domains</button>
+                <button type="button" style="background: #6f42c1;" id="mx-sync-gi-btn" onclick="discoverNewDomains()" title="Find new GI domains from imported emails and add them for MX scanning">Discover New Domains</button>
                 <button type="button" class="btn-pause" onclick="pauseMxScan()" id="mx-pause-btn" disabled>Pause</button>
                 <button type="button" class="btn-stop" onclick="stopMxScan()" id="mx-stop-btn" disabled>Stop</button>
                 <button type="button" style="background: #17a2b8; margin-left: 20px;" onclick="applyMxResults()">Apply to Emails</button>
@@ -800,35 +1095,241 @@ DASHBOARD_HTML = """
         var totalResults = 0;
         var perPage = 500;
         
+        // Toggle collapsible filter sections
+        function toggleFilterSection(sectionId) {
+            var section = document.getElementById(sectionId);
+            var toggle = document.getElementById(sectionId + '-toggle');
+            if (section.style.display === 'none') {
+                section.style.display = 'flex';
+                toggle.textContent = '-';
+            } else {
+                section.style.display = 'none';
+                toggle.textContent = '+';
+            }
+        }
+        
+        // Clear all filter inputs
+        function clearAllFilters() {
+            // Text inputs
+            var textInputs = ['email_search', 'domain', 'first_name', 'last_name', 'signup_domain', 'signup_ip', 'signup_date_from', 'signup_date_to'];
+            textInputs.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            // Selects - reset to first option
+            var selects = ['provider', 'category', 'state', 'city', 'zipcode', 'gender', 'country', 'has_phone', 'has_dob', 'clickers', 'openers', 'quality_tier', 'validation_status', 'data_source', 'file_source'];
+            selects.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.selectedIndex = 0;
+            });
+            document.getElementById('result-count').textContent = '';
+        }
+        
+        // Load filter dropdown options from API
+        function loadFilterOptions() {
+            // Load states
+            fetch('/api/filters/states')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var select = document.getElementById('state');
+                    if (select && data.states) {
+                        data.states.forEach(function(s) {
+                            var opt = document.createElement('option');
+                            opt.value = s.value;
+                            opt.textContent = s.value + ' (' + formatNum(s.count) + ')';
+                            select.appendChild(opt);
+                        });
+                    }
+                });
+            
+            // Load countries
+            fetch('/api/filters/countries')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var select = document.getElementById('country');
+                    if (select && data.countries) {
+                        data.countries.forEach(function(c) {
+                            var opt = document.createElement('option');
+                            opt.value = c.value;
+                            opt.textContent = c.value + ' (' + formatNum(c.count) + ')';
+                            select.appendChild(opt);
+                        });
+                    }
+                });
+            
+            // Load data sources
+            fetch('/api/filters/data-sources')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var select = document.getElementById('data_source');
+                    if (select && data.sources) {
+                        data.sources.forEach(function(s) {
+                            var opt = document.createElement('option');
+                            opt.value = s.value;
+                            opt.textContent = s.value + ' (' + formatNum(s.count) + ')';
+                            select.appendChild(opt);
+                        });
+                    }
+                });
+            
+            // Load validation statuses
+            fetch('/api/filters/validation-statuses')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var select = document.getElementById('validation_status');
+                    if (select && data.statuses) {
+                        data.statuses.forEach(function(s) {
+                            var opt = document.createElement('option');
+                            opt.value = s.value;
+                            opt.textContent = s.value + ' (' + formatNum(s.count) + ')';
+                            select.appendChild(opt);
+                        });
+                    }
+                });
+            
+            // Load genders with counts
+            fetch('/api/filters/genders')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var select = document.getElementById('gender');
+                    if (select && data.genders) {
+                        data.genders.forEach(function(g) {
+                            var opt = document.createElement('option');
+                            opt.value = g.value;
+                            var label = g.value === 'M' ? 'Male' : (g.value === 'F' ? 'Female' : g.value);
+                            opt.textContent = label + ' (' + formatNum(g.count) + ')';
+                            select.appendChild(opt);
+                        });
+                    }
+                });
+            
+            // Load cities with counts (top 200)
+            fetch('/api/filters/cities')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var select = document.getElementById('city');
+                    if (select && data.cities) {
+                        data.cities.forEach(function(c) {
+                            var opt = document.createElement('option');
+                            opt.value = c.value;
+                            opt.textContent = c.value + ' (' + formatNum(c.count) + ')';
+                            select.appendChild(opt);
+                        });
+                    }
+                });
+            
+            // Load zipcodes with counts (top 200)
+            fetch('/api/filters/zipcodes')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var select = document.getElementById('zipcode');
+                    if (select && data.zipcodes) {
+                        data.zipcodes.forEach(function(z) {
+                            var opt = document.createElement('option');
+                            opt.value = z.value;
+                            opt.textContent = z.value + ' (' + formatNum(z.count) + ')';
+                            select.appendChild(opt);
+                        });
+                    }
+                });
+
+            // Load file sources
+            fetch('/api/file-sources')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var select = document.getElementById('file_source');
+                    if (select && data.sources) {
+                        data.sources.forEach(function(s) {
+                            var opt = document.createElement('option');
+                            opt.value = s.filename;
+                            opt.textContent = s.filename + ' (' + formatNum(s.email_count) + ')';
+                            select.appendChild(opt);
+                        });
+                    }
+                });
+        }
+        
         function runQuery(page) {
             page = page || 1;
             currentPage = page;
             perPage = parseInt(document.getElementById('limit').value);
             var offset = (page - 1) * perPage;
             
-            var params = new URLSearchParams({
-                provider: document.getElementById('provider').value,
-                category: document.getElementById('category').value,
-                domain: document.getElementById('domain').value.toLowerCase().trim(),
-                min_score: document.getElementById('min_score').value,
-                state: document.getElementById('state').value.toUpperCase(),
-                clickers: document.getElementById('clickers').value,
-                limit: perPage,
-                offset: offset
-            });
+            // Build params with all filter fields
+            var params = new URLSearchParams();
+            
+            // Helper to add non-empty params
+            function addParam(name, elementId) {
+                var el = document.getElementById(elementId);
+                if (el && el.value && el.value.trim() !== '') {
+                    params.append(name, el.value.trim());
+                }
+            }
+            
+            // Basic filters
+            addParam('email_search', 'email_search');
+            addParam('provider', 'provider');
+            addParam('category', 'category');
+            addParam('domain', 'domain');
+            addParam('state', 'state');
+            
+            // Personal info
+            addParam('first_name', 'first_name');
+            addParam('last_name', 'last_name');
+            addParam('city', 'city');
+            addParam('zipcode', 'zipcode');
+            addParam('gender', 'gender');
+            addParam('country', 'country');
+            addParam('has_phone', 'has_phone');
+            addParam('has_dob', 'has_dob');
+            
+            // Engagement
+            addParam('clickers', 'clickers');
+            addParam('openers', 'openers');
+            addParam('quality_tier', 'quality_tier');
+            addParam('validation_status', 'validation_status');
+            
+            // Source tracking
+            addParam('data_source', 'data_source');
+            addParam('file_source', 'file_source');
+            addParam('signup_domain', 'signup_domain');
+            addParam('signup_ip', 'signup_ip');
+            addParam('signup_date_from', 'signup_date_from');
+            addParam('signup_date_to', 'signup_date_to');
+            
+            // Pagination
+            params.append('limit', perPage);
+            params.append('offset', offset);
             
             document.getElementById('results').innerHTML = '<p class="loading">Loading...</p>';
+            document.getElementById('result-count').textContent = 'Searching...';
             
             fetch('/api/query?' + params)
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.error) {
                         document.getElementById('results').innerHTML = '<p class="error">' + data.error + '</p>';
+                        document.getElementById('result-count').textContent = 'Error';
                         return;
                     }
                     totalResults = data.total_count || data.count;
                     var totalPages = Math.ceil(totalResults / perPage);
-                    var html = '<p>Showing ' + data.count + ' results</p><table><tr>';
+                    
+                    // Update result count
+                    document.getElementById('result-count').textContent = 'Found ' + formatNum(totalResults) + ' matching records';
+                    
+                    // Show/hide pagination
+                    var paginationDiv = document.getElementById('pagination');
+                    if (totalResults > perPage) {
+                        paginationDiv.style.display = 'block';
+                        document.getElementById('pageInfo').textContent = 'Page ' + currentPage + ' of ' + totalPages;
+                        document.getElementById('prevBtn').disabled = (currentPage <= 1);
+                        document.getElementById('nextBtn').disabled = (currentPage >= totalPages);
+                    } else {
+                        paginationDiv.style.display = 'none';
+                    }
+                    
+                    var html = '<p>Showing ' + data.count + ' of ' + formatNum(totalResults) + ' results</p><table><tr>';
                     var i, j;
                     for (i = 0; i < data.columns.length; i++) {
                         html += '<th>' + data.columns[i] + '</th>';
@@ -846,7 +1347,8 @@ DASHBOARD_HTML = """
                     document.getElementById('results').innerHTML = html;
                 })
                 .catch(function(e) {
-                    document.getElementById('results').innerHTML = '<p class="error">Error</p>';
+                    document.getElementById('results').innerHTML = '<p class="error">Error: ' + e + '</p>';
+                    document.getElementById('result-count').textContent = 'Error';
                 });
         }
         
@@ -896,18 +1398,218 @@ DASHBOARD_HTML = """
         }
         
         function exportCSV() {
-            var params = new URLSearchParams({
-                provider: document.getElementById('provider').value,
-                category: document.getElementById('category').value,
-                domain: document.getElementById('domain').value.toLowerCase().trim(),
-                min_score: document.getElementById('min_score').value,
-                state: document.getElementById('state').value.toUpperCase(),
-                clickers: document.getElementById('clickers').value,
-                file_source: document.getElementById('file_source').value,
-                limit: '50000'
-            });
+            // Build params with all filter fields (same as runQuery)
+            var params = new URLSearchParams();
+            
+            function addParam(name, elementId) {
+                var el = document.getElementById(elementId);
+                if (el && el.value && el.value.trim() !== '') {
+                    params.append(name, el.value.trim());
+                }
+            }
+            
+            // All filters
+            addParam('email_search', 'email_search');
+            addParam('provider', 'provider');
+            addParam('category', 'category');
+            addParam('domain', 'domain');
+            addParam('state', 'state');
+            addParam('first_name', 'first_name');
+            addParam('last_name', 'last_name');
+            addParam('city', 'city');
+            addParam('zipcode', 'zipcode');
+            addParam('gender', 'gender');
+            addParam('country', 'country');
+            addParam('has_phone', 'has_phone');
+            addParam('has_dob', 'has_dob');
+            addParam('clickers', 'clickers');
+            addParam('openers', 'openers');
+            addParam('quality_tier', 'quality_tier');
+            addParam('validation_status', 'validation_status');
+            addParam('data_source', 'data_source');
+            addParam('file_source', 'file_source');
+            addParam('signup_domain', 'signup_domain');
+            addParam('signup_ip', 'signup_ip');
+            addParam('signup_date_from', 'signup_date_from');
+            addParam('signup_date_to', 'signup_date_to');
+            
+            params.append('limit', '50000');
             window.location.href = '/api/export?' + params;
         }
+        
+        // Load detailed stats for Stats tab
+        function loadDetailedStats() {
+            document.getElementById('stats-loading').style.display = 'inline';
+            fetch('/api/stats/detailed')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                document.getElementById('stats-loading').style.display = 'none';
+                if (data.error) {
+                    console.error('Stats error:', data.error, data.trace);
+                    alert('Error loading stats: ' + data.error);
+                    return;
+                }
+                
+                // Update timestamp from cache
+                if (data.cache_updated) {
+                    var cacheDate = new Date(data.cache_updated);
+                    document.getElementById('stats-updated').textContent = cacheDate.toLocaleString();
+                } else {
+                    document.getElementById('stats-updated').textContent = 'Never';
+                }
+                
+                // Summary totals - use helper to avoid null errors
+                function setStatText(id, val) {
+                    var el = document.getElementById(id);
+                    if (el) el.textContent = val;
+                }
+                
+                setStatText('stat-total', formatNum(data.total));
+                setStatText('stat-good-total', formatNum(data.good_total));
+                setStatText('stat-dead-total', formatNum(data.dead_total));
+                
+                // Clickers & Openers totals
+                setStatText('stat-clickers', formatNum(data.clickers));
+                setStatText('stat-openers', formatNum(data.openers));
+                
+                // Big4 row
+                setStatText('stat-big4-total', formatNum(data.big4_total));
+                setStatText('stat-big4-good', formatNum(data.big4_good));
+                setStatText('stat-big4-dead', formatNum(data.big4_dead));
+                setStatText('stat-clickers-big4', formatNum(data.clickers_big4));
+                setStatText('stat-openers-big4', formatNum(data.openers_big4));
+                
+                // Cable row
+                setStatText('stat-cable-total', formatNum(data.cable_total));
+                setStatText('stat-cable-good', formatNum(data.cable_good));
+                setStatText('stat-cable-dead', formatNum(data.cable_dead));
+                setStatText('stat-clickers-cable', formatNum(data.clickers_cable));
+                setStatText('stat-openers-cable', formatNum(data.openers_cable));
+                
+                // GI row
+                setStatText('stat-gi-total', formatNum(data.gi_total));
+                setStatText('stat-gi-good', formatNum(data.gi_good));
+                setStatText('stat-gi-dead', formatNum(data.gi_dead));
+                setStatText('stat-clickers-gi', formatNum(data.clickers_gi));
+                setStatText('stat-openers-gi', formatNum(data.openers_gi));
+                
+                // Big4 breakdown - full stats for each (Total, Good, Dead, High, Med, Low, Click, Open, Doms)
+                var big4Providers = ['gmail', 'yahoo', 'outlook'];
+                big4Providers.forEach(function(p) {
+                    setStatText('stat-' + p, formatNum(data[p]));
+                    setStatText('stat-' + p + '-good', formatNum(data[p + '_good']));
+                    setStatText('stat-' + p + '-dead', formatNum(data[p + '_dead']));
+                    setStatText('stat-' + p + '-high', formatNum(data[p + '_high']));
+                    setStatText('stat-' + p + '-med', formatNum(data[p + '_med']));
+                    setStatText('stat-' + p + '-low', formatNum(data[p + '_low']));
+                    setStatText('stat-' + p + '-click', formatNum(data[p + '_click']));
+                    setStatText('stat-' + p + '-open', formatNum(data[p + '_open']));
+                    setStatText('stat-' + p + '-domains', formatNum(data[p + '_domains']));
+                });
+                
+                // Cable Provider breakdown
+                var cableProviders = ['comcast', 'spectrum', 'centurylink', 'earthlink', 'windstream', 'optimum'];
+                cableProviders.forEach(function(p) {
+                    setStatText('stat-' + p, formatNum(data[p]));
+                    setStatText('stat-' + p + '-good', formatNum(data[p + '_good']));
+                    setStatText('stat-' + p + '-dead', formatNum(data[p + '_dead']));
+                    setStatText('stat-' + p + '-high', formatNum(data[p + '_high']));
+                    setStatText('stat-' + p + '-med', formatNum(data[p + '_med']));
+                    setStatText('stat-' + p + '-low', formatNum(data[p + '_low']));
+                    setStatText('stat-' + p + '-click', formatNum(data[p + '_click']));
+                    setStatText('stat-' + p + '-open', formatNum(data[p + '_open']));
+                    setStatText('stat-' + p + '-domains', formatNum(data[p + '_domains']));
+                });
+                
+                // 2nd Level Big4 - main table row
+                setStatText('stat-2nd-big4-total', formatNum(data['2nd_big4_total']));
+                setStatText('stat-2nd-big4-good', formatNum(data['2nd_big4_good']));
+                setStatText('stat-2nd-big4-dead', formatNum(data['2nd_big4_dead']));
+                setStatText('stat-2nd-big4-clickers', formatNum(data['2nd_big4_clickers']));
+                setStatText('stat-2nd-big4-openers', formatNum(data['2nd_big4_openers']));
+                
+                // 2nd Level Big4 - breakdown with all columns
+                var big4Hosted = ['google-hosted', 'microsoft-hosted', 'yahoo-hosted'];
+                big4Hosted.forEach(function(p) {
+                    var key = p.replace('-', '_');
+                    setStatText('stat-' + p, formatNum(data[key]));
+                    setStatText('stat-' + p + '-good', formatNum(data[key + '_good']));
+                    setStatText('stat-' + p + '-dead', formatNum(data[key + '_dead']));
+                    setStatText('stat-' + p + '-high', formatNum(data[key + '_high']));
+                    setStatText('stat-' + p + '-med', formatNum(data[key + '_med']));
+                    setStatText('stat-' + p + '-low', formatNum(data[key + '_low']));
+                    setStatText('stat-' + p + '-click', formatNum(data[key + '_click']));
+                    setStatText('stat-' + p + '-open', formatNum(data[key + '_open']));
+                    setStatText('stat-' + p + '-domains', formatNum(data[key + '_domains']));
+                });
+                
+                // GI Hosting providers - full stats for each
+                var giProviders = ['apple', 'godaddy', '1and1', 'hostgator', 'namecheap', 'zoho', 'fastmail', 'amazonses', 'protonmail', 'cloudflare'];
+                giProviders.forEach(function(p) {
+                    setStatText('stat-' + p, formatNum(data[p]));
+                    setStatText('stat-' + p + '-good', formatNum(data[p + '_good']));
+                    setStatText('stat-' + p + '-dead', formatNum(data[p + '_dead']));
+                    setStatText('stat-' + p + '-high', formatNum(data[p + '_high']));
+                    setStatText('stat-' + p + '-med', formatNum(data[p + '_med']));
+                    setStatText('stat-' + p + '-low', formatNum(data[p + '_low']));
+                    setStatText('stat-' + p + '-click', formatNum(data[p + '_click']));
+                    setStatText('stat-' + p + '-open', formatNum(data[p + '_open']));
+                    setStatText('stat-' + p + '-domains', formatNum(data[p + '_domains']));
+                });
+                
+                // GI domains count
+                setStatText('stat-gi-domains', formatNum(data.gi_domains));
+                
+                // Top 10 GI Domains
+                var tbody = document.getElementById('top-gi-domains-body');
+                if (tbody && data.top_gi_domains && data.top_gi_domains.length > 0) {
+                    var html = '';
+                    data.top_gi_domains.forEach(function(d) {
+                        html += '<tr>' +
+                            '<td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis;">' + d.domain + '</td>' +
+                            '<td style="text-align: right;">' + formatNum(d.total) + '</td>' +
+                            '<td style="text-align: right; color: #28a745;">' + formatNum(d.good) + '</td>' +
+                            '<td style="text-align: right; color: #dc3545;">' + formatNum(d.dead) + '</td>' +
+                            '<td style="text-align: right; color: #00d4ff;">' + formatNum(d.high) + '</td>' +
+                            '<td style="text-align: right; color: #ffc107;">' + formatNum(d.med) + '</td>' +
+                            '<td style="text-align: right; color: #6c757d;">' + formatNum(d.low) + '</td>' +
+                            '<td style="text-align: right; color: #e83e8c;">' + formatNum(d.click) + '</td>' +
+                            '<td style="text-align: right; color: #17a2b8;">' + formatNum(d.open) + '</td>' +
+                            '</tr>';
+                    });
+                    tbody.innerHTML = html;
+                }
+            })
+            .catch(function(e) {
+                document.getElementById('stats-loading').style.display = 'none';
+                console.error('Failed to load stats:', e);
+            });
+        }
+        
+        // Recalculate stats (slow - updates cache)
+        function recalculateStats() {
+            if (!confirm('This will recalculate all stats from the database.\\nThis takes about 10 seconds. Continue?')) return;
+            document.getElementById('stats-loading').style.display = 'inline';
+            document.getElementById('stats-loading').textContent = 'Recalculating...';
+            fetch('/api/stats/refresh', {method: 'POST'})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                document.getElementById('stats-loading').style.display = 'none';
+                if (data.success) {
+                    alert('Stats recalculated! ' + data.stats_updated + ' stats updated.');
+                    loadDetailedStats();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(function(e) {
+                document.getElementById('stats-loading').style.display = 'none';
+                alert('Error recalculating stats: ' + e);
+            });
+        }
+        
+        // Load stats when Stats tab is shown
+        var originalShowTab = typeof showTab === 'function' ? showTab : null;
         
         function loadFileSources() {
             fetch('/api/file-sources')
@@ -937,6 +1639,7 @@ DASHBOARD_HTML = """
         // Load file sources on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadFileSources();
+            loadFilterOptions();
         });
         
         // =====================================================
@@ -964,7 +1667,7 @@ DASHBOARD_HTML = """
                 if (tabName === 'config' && allBtns[3]) allBtns[3].className = 'tab-btn active';
                 // Load stats only when stats tab is shown
                 if (tabName === 'stats') {
-                    try { ensureStatsLoaded(); } catch(e) { console.log('Stats error:', e); }
+                    try { loadDetailedStats(); } catch(e) { console.log('Stats error:', e); }
                 }
                 // Load domain config when config tab is shown
                 if (tabName === 'config') {
@@ -1293,10 +1996,10 @@ DASHBOARD_HTML = """
             });
         }
         
-        function syncGiDomains() {
-            if (!confirm('Sync GI domains from emails table? This will find missing domains and flag them for scanning (preserves existing scan results).')) return;
+        function discoverNewDomains() {
+            if (!confirm('Discover new GI domains from imported emails? This will find domains not yet in the MX table and add them for scanning.')) return;
             document.getElementById('mx-sync-gi-btn').disabled = true;
-            addMxLog('SYSTEM', 'Syncing GI domains from emails table...', 'Info');
+            addMxLog('SYSTEM', 'Discovering new GI domains from imported emails...', 'Info');
             fetch('/api/mx/sync-gi', { method: 'POST' })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -1306,9 +2009,9 @@ DASHBOARD_HTML = """
                     alert('Error: ' + data.error);
                     return;
                 }
-                var msg = 'GI Sync complete! Before: ' + formatNum(data.gi_before) + ' -> After: ' + formatNum(data.gi_after) + '. Inserted ' + formatNum(data.domains_inserted) + ' new, flagged ' + formatNum(data.domains_flagged) + ' existing. Ready to scan: ' + formatNum(data.unchecked_to_scan);
+                var msg = 'Discovery complete! Found ' + formatNum(data.domains_inserted) + ' new domains. Ready to scan: ' + formatNum(data.unchecked_to_scan);
                 addMxLog('SYSTEM', msg, 'Info');
-                alert('Sync complete! GI domains: ' + formatNum(data.gi_before) + ' -> ' + formatNum(data.gi_after) + '. Inserted: ' + formatNum(data.domains_inserted) + ', Flagged: ' + formatNum(data.domains_flagged) + '. Ready to scan: ' + formatNum(data.unchecked_to_scan));
+                alert('Discovery complete!\\n\\nNew domains found: ' + formatNum(data.domains_inserted) + '\\nReady to scan: ' + formatNum(data.unchecked_to_scan));
                 checkMxStatus(); // Refresh stats
             })
             .catch(function(e) {
@@ -2024,16 +2727,471 @@ def api_stats():
         return jsonify({'error': str(e)})
 
 
+@app.route('/api/stats/detailed')
+def api_stats_detailed():
+    """Return stats from cache (instant) or calculate fresh."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Read from cache (instant!)
+        cursor.execute("SELECT stat_name, stat_value, updated_at FROM stats_cache")
+        rows = cursor.fetchall()
+        
+        stats = {}
+        updated_at = None
+        for name, value, ts in rows:
+            stats[name] = value
+            if updated_at is None or (ts and ts > updated_at):
+                updated_at = ts
+        
+        # Add aliases and defaults
+        stats['good_big4'] = stats.get('big4_good', 0)
+        stats['good_cable'] = stats.get('cable_good', 0)
+        stats['good_gi'] = stats.get('gi_good', 0)
+        stats['good_all'] = stats.get('good_total', 0)
+        if 'gi_domains' not in stats:
+            stats['gi_domains'] = 0
+        stats['cache_updated'] = updated_at.isoformat() if updated_at else None
+        
+        # All provider defaults - base stats, good, dead, quality tiers, clickers, openers, domains
+        # Big4 providers
+        for p in ['gmail', 'yahoo', 'outlook']:
+            for suffix in ['', '_good', '_dead', '_high', '_med', '_low', '_click', '_open', '_domains']:
+                if p + suffix not in stats:
+                    stats[p + suffix] = 0
+        
+        # Cable providers
+        for p in ['comcast', 'spectrum', 'centurylink', 'earthlink', 'windstream', 'optimum']:
+            for suffix in ['', '_good', '_dead', '_high', '_med', '_low', '_click', '_open', '_domains']:
+                if p + suffix not in stats:
+                    stats[p + suffix] = 0
+        
+        # 2nd Level Big4 totals
+        for key in ['2nd_big4_total', '2nd_big4_good', '2nd_big4_dead', '2nd_big4_clickers', '2nd_big4_openers', '2nd_big4_domains']:
+            if key not in stats:
+                stats[key] = 0
+        
+        # 2nd Level Big4 breakdown
+        for p in ['google_hosted', 'microsoft_hosted', 'yahoo_hosted']:
+            for suffix in ['', '_good', '_dead', '_domains', '_high', '_med', '_low', '_click', '_open']:
+                if p + suffix not in stats:
+                    stats[p + suffix] = 0
+        
+        # GI Hosting providers
+        for p in ['apple', 'godaddy', '1and1', 'hostgator', 'namecheap', 'zoho', 'fastmail', 'amazonses', 'protonmail', 'cloudflare']:
+            for suffix in ['', '_good', '_dead', '_domains', '_high', '_med', '_low', '_click', '_open']:
+                if p + suffix not in stats:
+                    stats[p + suffix] = 0
+        
+        # Top 10 GI Domains (query fresh each time - fast with index)
+        # Exclude Apple domains since they have their own category
+        cursor.execute("""
+            SELECT 
+                email_domain,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE mx_valid = true OR mx_valid IS NULL) as good,
+                COUNT(*) FILTER (WHERE mx_valid = false) as dead,
+                COUNT(*) FILTER (WHERE quality_score >= 70) as high,
+                COUNT(*) FILTER (WHERE quality_score >= 40 AND quality_score < 70) as med,
+                COUNT(*) FILTER (WHERE quality_score < 40 OR quality_score IS NULL) as low,
+                COUNT(*) FILTER (WHERE is_clicker = true) as clickers,
+                COUNT(*) FILTER (WHERE is_opener = true) as openers
+            FROM emails 
+            WHERE email_category = 'General_Internet'
+              AND email_domain NOT IN ('icloud.com', 'me.com', 'mac.com')
+            GROUP BY email_domain
+            ORDER BY total DESC
+            LIMIT 10
+        """)
+        top_gi = []
+        for row in cursor.fetchall():
+            top_gi.append({
+                'domain': row[0],
+                'total': row[1],
+                'good': row[2],
+                'dead': row[3],
+                'high': row[4],
+                'med': row[5],
+                'low': row[6],
+                'click': row[7],
+                'open': row[8]
+            })
+        stats['top_gi_domains'] = top_gi
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify(stats)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()})
+
+
+@app.route('/api/stats/refresh', methods=['POST'])
+def api_stats_refresh():
+    """Recalculate and update stats cache."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Fast GROUP BY query
+        cursor.execute("""
+            SELECT 
+                email_category,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE mx_valid = true OR mx_valid IS NULL) as good,
+                COUNT(*) FILTER (WHERE mx_valid = false) as dead,
+                COUNT(*) FILTER (WHERE is_clicker = true) as clickers,
+                COUNT(*) FILTER (WHERE is_opener = true) as openers
+            FROM emails
+            GROUP BY email_category
+        """)
+        
+        stats = {'total': 0, 'good_total': 0, 'dead_total': 0, 'clickers': 0, 'openers': 0}
+        
+        for row in cursor.fetchall():
+            cat, total, good, dead, clickers, openers = row
+            stats['total'] += total
+            stats['good_total'] += good
+            stats['dead_total'] += dead
+            stats['clickers'] += clickers
+            stats['openers'] += openers
+            
+            if cat == 'Big4_ISP':
+                stats['big4_total'] = total
+                stats['big4_good'] = good
+                stats['big4_dead'] = dead
+                stats['clickers_big4'] = clickers
+                stats['openers_big4'] = openers
+            elif cat == 'Cable_Provider':
+                stats['cable_total'] = total
+                stats['cable_good'] = good
+                stats['cable_dead'] = dead
+                stats['clickers_cable'] = clickers
+                stats['openers_cable'] = openers
+            elif cat == 'General_Internet':
+                stats['gi_total'] = total
+                stats['gi_good'] = good
+                stats['gi_dead'] = dead
+                stats['clickers_gi'] = clickers
+                stats['openers_gi'] = openers
+        
+        # Provider breakdown (Big 4 = Gmail, Yahoo, Outlook) with all stats including domain count
+        cursor.execute("""
+            SELECT email_provider,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE mx_valid = true OR mx_valid IS NULL) as good,
+                COUNT(*) FILTER (WHERE mx_valid = false) as dead,
+                COUNT(*) FILTER (WHERE quality_score >= 70) as high,
+                COUNT(*) FILTER (WHERE quality_score >= 40 AND quality_score < 70) as med,
+                COUNT(*) FILTER (WHERE quality_score < 40 OR quality_score IS NULL) as low,
+                COUNT(*) FILTER (WHERE is_clicker = true) as clickers,
+                COUNT(*) FILTER (WHERE is_opener = true) as openers,
+                COUNT(DISTINCT email_domain) as domains
+            FROM emails 
+            WHERE email_provider IN ('Google', 'Yahoo', 'Microsoft')
+            GROUP BY email_provider
+        """)
+        for row in cursor.fetchall():
+            provider, total, good, dead, high, med, low, clickers, openers, domains = row
+            if provider == 'Google':
+                stats['gmail'] = total
+                stats['gmail_good'] = good
+                stats['gmail_dead'] = dead
+                stats['gmail_high'] = high
+                stats['gmail_med'] = med
+                stats['gmail_low'] = low
+                stats['gmail_click'] = clickers
+                stats['gmail_open'] = openers
+                stats['gmail_domains'] = domains
+            elif provider == 'Yahoo':
+                stats['yahoo'] = total
+                stats['yahoo_good'] = good
+                stats['yahoo_dead'] = dead
+                stats['yahoo_high'] = high
+                stats['yahoo_med'] = med
+                stats['yahoo_low'] = low
+                stats['yahoo_click'] = clickers
+                stats['yahoo_open'] = openers
+                stats['yahoo_domains'] = domains
+            elif provider == 'Microsoft':
+                stats['outlook'] = total
+                stats['outlook_good'] = good
+                stats['outlook_dead'] = dead
+                stats['outlook_high'] = high
+                stats['outlook_med'] = med
+                stats['outlook_low'] = low
+                stats['outlook_click'] = clickers
+                stats['outlook_open'] = openers
+                stats['outlook_domains'] = domains
+        
+        # Cable Provider breakdown (Comcast, Spectrum/RR, CenturyLink, EarthLink, Windstream, Optimum)
+        cursor.execute("""
+            SELECT 
+                CASE 
+                    WHEN email_domain IN ('comcast.net', 'comcast.com', 'xfinity.com') THEN 'comcast'
+                    WHEN email_domain LIKE '%.rr.com' OR email_domain IN ('charter.net', 'charter.com', 'spectrum.net', 'brighthouse.com', 'rr.com', 'twc.com', 'roadrunner.com') THEN 'spectrum'
+                    WHEN email_domain IN ('centurylink.net', 'centurylink.com', 'centurytel.net', 'q.com', 'qwest.net', 'qwest.com', 'embarqmail.com', 'qwestoffice.net', 'uswest.net') THEN 'centurylink'
+                    WHEN email_domain IN ('earthlink.net', 'earthlink.com', 'mindspring.com') THEN 'earthlink'
+                    WHEN email_domain IN ('windstream.net', 'windstream.com') THEN 'windstream'
+                    WHEN email_domain IN ('optonline.net', 'optimum.net', 'cablevision.com') THEN 'optimum'
+                END as provider,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE mx_valid = true OR mx_valid IS NULL) as good,
+                COUNT(*) FILTER (WHERE mx_valid = false) as dead,
+                COUNT(*) FILTER (WHERE quality_score >= 70) as high,
+                COUNT(*) FILTER (WHERE quality_score >= 40 AND quality_score < 70) as med,
+                COUNT(*) FILTER (WHERE quality_score < 40 OR quality_score IS NULL) as low,
+                COUNT(*) FILTER (WHERE is_clicker = true) as clickers,
+                COUNT(*) FILTER (WHERE is_opener = true) as openers,
+                COUNT(DISTINCT email_domain) as domains
+            FROM emails 
+            WHERE email_category = 'Cable_Provider'
+              AND (
+                  email_domain IN ('comcast.net', 'comcast.com', 'xfinity.com',
+                                   'charter.net', 'charter.com', 'spectrum.net', 'brighthouse.com', 'rr.com', 'twc.com', 'roadrunner.com',
+                                   'centurylink.net', 'centurylink.com', 'centurytel.net', 'q.com', 'qwest.net', 'qwest.com', 'embarqmail.com', 'qwestoffice.net', 'uswest.net',
+                                   'earthlink.net', 'earthlink.com', 'mindspring.com',
+                                   'windstream.net', 'windstream.com',
+                                   'optonline.net', 'optimum.net', 'cablevision.com')
+                  OR email_domain LIKE '%.rr.com'
+              )
+            GROUP BY 1
+        """)
+        for row in cursor.fetchall():
+            if row[0]:
+                provider = row[0]
+                stats[provider] = row[1]
+                stats[f'{provider}_good'] = row[2]
+                stats[f'{provider}_dead'] = row[3]
+                stats[f'{provider}_high'] = row[4]
+                stats[f'{provider}_med'] = row[5]
+                stats[f'{provider}_low'] = row[6]
+                stats[f'{provider}_click'] = row[7]
+                stats[f'{provider}_open'] = row[8]
+                stats[f'{provider}_domains'] = row[9]
+        
+        # Apple (iCloud/me.com/mac.com) with all stats
+        cursor.execute("""
+            SELECT COUNT(*) as total,
+                COUNT(*) FILTER (WHERE mx_valid = true OR mx_valid IS NULL) as good,
+                COUNT(*) FILTER (WHERE mx_valid = false) as dead,
+                COUNT(*) FILTER (WHERE quality_score >= 70) as high,
+                COUNT(*) FILTER (WHERE quality_score >= 40 AND quality_score < 70) as med,
+                COUNT(*) FILTER (WHERE quality_score < 40 OR quality_score IS NULL) as low,
+                COUNT(*) FILTER (WHERE is_clicker = true) as clickers,
+                COUNT(*) FILTER (WHERE is_opener = true) as openers
+            FROM emails WHERE email_domain IN ('icloud.com', 'me.com', 'mac.com')
+        """)
+        apple = cursor.fetchone()
+        stats['apple'] = apple[0]
+        stats['apple_good'] = apple[1]
+        stats['apple_dead'] = apple[2]
+        stats['apple_domains'] = 3
+        stats['apple_high'] = apple[3]
+        stats['apple_med'] = apple[4]
+        stats['apple_low'] = apple[5]
+        stats['apple_click'] = apple[6]
+        stats['apple_open'] = apple[7]
+        
+        # 2nd Level Big4: GI domains hosted on Google/Microsoft/Yahoo MX
+        # Join emails with domain_mx to get counts based on mx_category
+        cursor.execute("""
+            SELECT 
+                dm.mx_category,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE e.mx_valid = true OR e.mx_valid IS NULL) as good,
+                COUNT(*) FILTER (WHERE e.mx_valid = false) as dead,
+                COUNT(*) FILTER (WHERE e.quality_score >= 70) as high,
+                COUNT(*) FILTER (WHERE e.quality_score >= 40 AND e.quality_score < 70) as med,
+                COUNT(*) FILTER (WHERE e.quality_score < 40 OR e.quality_score IS NULL) as low,
+                COUNT(*) FILTER (WHERE e.is_clicker = true) as clickers,
+                COUNT(*) FILTER (WHERE e.is_opener = true) as openers,
+                COUNT(DISTINCT e.email_domain) as domains
+            FROM emails e
+            JOIN domain_mx dm ON e.email_domain = dm.domain
+            WHERE e.email_category = 'General_Internet'
+              AND dm.mx_category IN ('Google', 'Microsoft', 'Yahoo')
+            GROUP BY dm.mx_category
+        """)
+        
+        # Initialize 2nd level totals
+        stats['2nd_big4_total'] = 0
+        stats['2nd_big4_good'] = 0
+        stats['2nd_big4_dead'] = 0
+        stats['2nd_big4_clickers'] = 0
+        stats['2nd_big4_openers'] = 0
+        stats['2nd_big4_domains'] = 0
+        
+        for row in cursor.fetchall():
+            mx_cat, total, good, dead, high, med, low, clickers, openers, domains = row
+            stats['2nd_big4_total'] += total
+            stats['2nd_big4_good'] += good
+            stats['2nd_big4_dead'] += dead
+            stats['2nd_big4_clickers'] += clickers
+            stats['2nd_big4_openers'] += openers
+            stats['2nd_big4_domains'] += domains
+            
+            if mx_cat == 'Google':
+                stats['google_hosted'] = total
+                stats['google_hosted_good'] = good
+                stats['google_hosted_dead'] = dead
+                stats['google_hosted_domains'] = domains
+                stats['google_hosted_high'] = high
+                stats['google_hosted_med'] = med
+                stats['google_hosted_low'] = low
+                stats['google_hosted_click'] = clickers
+                stats['google_hosted_open'] = openers
+            elif mx_cat == 'Microsoft':
+                stats['microsoft_hosted'] = total
+                stats['microsoft_hosted_good'] = good
+                stats['microsoft_hosted_dead'] = dead
+                stats['microsoft_hosted_domains'] = domains
+                stats['microsoft_hosted_high'] = high
+                stats['microsoft_hosted_med'] = med
+                stats['microsoft_hosted_low'] = low
+                stats['microsoft_hosted_click'] = clickers
+                stats['microsoft_hosted_open'] = openers
+            elif mx_cat == 'Yahoo':
+                stats['yahoo_hosted'] = total
+                stats['yahoo_hosted_good'] = good
+                stats['yahoo_hosted_dead'] = dead
+                stats['yahoo_hosted_domains'] = domains
+                stats['yahoo_hosted_high'] = high
+                stats['yahoo_hosted_med'] = med
+                stats['yahoo_hosted_low'] = low
+                stats['yahoo_hosted_click'] = clickers
+                stats['yahoo_hosted_open'] = openers
+        
+        # GI Hosting providers breakdown (by mx_category from domain_mx)
+        cursor.execute("""
+            SELECT 
+                dm.mx_category,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE e.mx_valid = true OR e.mx_valid IS NULL) as good,
+                COUNT(*) FILTER (WHERE e.mx_valid = false) as dead,
+                COUNT(DISTINCT e.email_domain) as domains,
+                COUNT(*) FILTER (WHERE e.quality_score >= 70) as high,
+                COUNT(*) FILTER (WHERE e.quality_score >= 40 AND e.quality_score < 70) as med,
+                COUNT(*) FILTER (WHERE e.quality_score < 40 OR e.quality_score IS NULL) as low,
+                COUNT(*) FILTER (WHERE e.is_clicker = true) as clickers,
+                COUNT(*) FILTER (WHERE e.is_opener = true) as openers
+            FROM emails e
+            JOIN domain_mx dm ON e.email_domain = dm.domain
+            WHERE e.email_category = 'General_Internet'
+              AND dm.mx_category IN ('Fastmail', 'ProtonMail', 'Amazon')
+            GROUP BY dm.mx_category
+        """)
+        
+        provider_map = {
+            'Fastmail': 'fastmail',
+            'ProtonMail': 'protonmail',
+            'Amazon': 'amazonses',
+        }
+        
+        for row in cursor.fetchall():
+            mx_cat, total, good, dead, domains, high, med, low, clickers, openers = row
+            if mx_cat in provider_map:
+                key = provider_map[mx_cat]
+                stats[key] = total
+                stats[key + '_good'] = good
+                stats[key + '_dead'] = dead
+                stats[key + '_domains'] = domains
+                stats[key + '_high'] = high
+                stats[key + '_med'] = med
+                stats[key + '_low'] = low
+                stats[key + '_click'] = clickers
+                stats[key + '_open'] = openers
+        
+        # GoDaddy, 1&1, HostGator, Namecheap, Zoho, Cloudflare - check mx_primary patterns
+        cursor.execute("""
+            SELECT 
+                CASE 
+                    WHEN dm.mx_primary ILIKE '%secureserver.net%' THEN 'godaddy'
+                    WHEN dm.mx_primary ILIKE '%ionos%' OR dm.mx_primary ILIKE '%1and1%' THEN '1and1'
+                    WHEN dm.mx_primary ILIKE '%hostgator%' OR dm.mx_primary ILIKE '%websitewelcome%' THEN 'hostgator'
+                    WHEN dm.mx_primary ILIKE '%privateemail.com%' OR dm.mx_primary ILIKE '%registrar-servers%' THEN 'namecheap'
+                    WHEN dm.mx_primary ILIKE '%zoho%' THEN 'zoho'
+                    WHEN dm.mx_primary ILIKE '%cloudflare.net%' THEN 'cloudflare'
+                    ELSE 'other'
+                END as provider,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE e.mx_valid = true OR e.mx_valid IS NULL) as good,
+                COUNT(*) FILTER (WHERE e.mx_valid = false) as dead,
+                COUNT(DISTINCT e.email_domain) as domains,
+                COUNT(*) FILTER (WHERE e.quality_score >= 70) as high,
+                COUNT(*) FILTER (WHERE e.quality_score >= 40 AND e.quality_score < 70) as med,
+                COUNT(*) FILTER (WHERE e.quality_score < 40 OR e.quality_score IS NULL) as low,
+                COUNT(*) FILTER (WHERE e.is_clicker = true) as clickers,
+                COUNT(*) FILTER (WHERE e.is_opener = true) as openers
+            FROM emails e
+            JOIN domain_mx dm ON e.email_domain = dm.domain
+            WHERE e.email_category = 'General_Internet'
+              AND dm.mx_category IN ('Real_GI', 'General_Internet')
+              AND (
+                  dm.mx_primary ILIKE '%secureserver.net%' OR
+                  dm.mx_primary ILIKE '%ionos%' OR dm.mx_primary ILIKE '%1and1%' OR
+                  dm.mx_primary ILIKE '%hostgator%' OR dm.mx_primary ILIKE '%websitewelcome%' OR
+                  dm.mx_primary ILIKE '%privateemail.com%' OR dm.mx_primary ILIKE '%registrar-servers%' OR
+                  dm.mx_primary ILIKE '%zoho%' OR
+                  dm.mx_primary ILIKE '%cloudflare.net%'
+              )
+            GROUP BY 1
+        """)
+        
+        for row in cursor.fetchall():
+            provider, total, good, dead, domains, high, med, low, clickers, openers = row
+            if provider != 'other':
+                stats[provider] = total
+                stats[f'{provider}_good'] = good
+                stats[f'{provider}_dead'] = dead
+                stats[f'{provider}_domains'] = domains
+                stats[f'{provider}_high'] = high
+                stats[f'{provider}_med'] = med
+                stats[f'{provider}_low'] = low
+                stats[f'{provider}_click'] = clickers
+                stats[f'{provider}_open'] = openers
+        
+        # GI Unique Domains count
+        cursor.execute("""
+            SELECT COUNT(DISTINCT email_domain) FROM emails WHERE email_category = 'General_Internet'
+        """)
+        stats['gi_domains'] = cursor.fetchone()[0]
+        
+        # Update cache
+        for name, value in stats.items():
+            cursor.execute("""
+                INSERT INTO stats_cache (stat_name, stat_value, updated_at) VALUES (%s, %s, NOW())
+                ON CONFLICT (stat_name) DO UPDATE SET stat_value = EXCLUDED.stat_value, updated_at = NOW()
+            """, (name, value))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'success': True, 'stats_updated': len(stats)})
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()})
+
+
 @app.route('/api/query')
 def api_query():
     try:
         conn = get_db()
         cursor = conn.cursor()
         
-        # Build WHERE clause
+        # Build WHERE clause with all filter parameters
         where_parts = ["1=1"]
         params = []
         
+        # Basic filters
+        if request.args.get('email_search'):
+            email_search = request.args.get('email_search').strip().lower()
+            if email_search:
+                where_parts.append("LOWER(email) LIKE %s")
+                params.append(f"%{email_search}%")
         if request.args.get('provider'):
             where_parts.append("email_provider = %s")
             params.append(request.args.get('provider'))
@@ -2041,19 +3199,94 @@ def api_query():
             where_parts.append("email_category = %s")
             params.append(request.args.get('category'))
         if request.args.get('domain'):
-            # Support partial domain matching
             domain = request.args.get('domain').strip().lower()
             if domain:
-                where_parts.append("email_domain LIKE %s")
+                where_parts.append("LOWER(email_domain) LIKE %s")
                 params.append(f"%{domain}%")
-        if request.args.get('min_score'):
-            where_parts.append("quality_score >= %s")
-            params.append(int(request.args.get('min_score')))
         if request.args.get('state'):
-            where_parts.append("state = %s")
-            params.append(request.args.get('state'))
-        if request.args.get('clickers') == 'true':
-            where_parts.append("is_clicker = true")
+            where_parts.append("UPPER(state) = %s")
+            params.append(request.args.get('state').upper())
+        
+        # Personal info filters
+        if request.args.get('first_name'):
+            where_parts.append("LOWER(first_name) LIKE %s")
+            params.append(f"%{request.args.get('first_name').strip().lower()}%")
+        if request.args.get('last_name'):
+            where_parts.append("LOWER(last_name) LIKE %s")
+            params.append(f"%{request.args.get('last_name').strip().lower()}%")
+        if request.args.get('city'):
+            where_parts.append("LOWER(city) LIKE %s")
+            params.append(f"%{request.args.get('city').strip().lower()}%")
+        if request.args.get('zipcode'):
+            where_parts.append("zipcode LIKE %s")
+            params.append(f"{request.args.get('zipcode').strip()}%")
+        if request.args.get('gender'):
+            g = request.args.get('gender')
+            if g == 'M':
+                where_parts.append("(gender = 'M' OR UPPER(gender) = 'MALE')")
+            elif g == 'F':
+                where_parts.append("(gender = 'F' OR UPPER(gender) = 'FEMALE')")
+            else:
+                where_parts.append("gender = %s")
+                params.append(g)
+        if request.args.get('country'):
+            where_parts.append("country = %s")
+            params.append(request.args.get('country'))
+        if request.args.get('has_phone') == 'true':
+            where_parts.append("phone IS NOT NULL AND phone != ''")
+        elif request.args.get('has_phone') == 'false':
+            where_parts.append("(phone IS NULL OR phone = '')")
+        if request.args.get('has_dob') == 'true':
+            where_parts.append("dob IS NOT NULL")
+        elif request.args.get('has_dob') == 'false':
+            where_parts.append("dob IS NULL")
+        
+        # Engagement filters
+        # Clickers/Openers - use OR logic when both are "true"
+        clickers_val = request.args.get('clickers')
+        openers_val = request.args.get('openers')
+        if clickers_val == 'true' and openers_val == 'true':
+            where_parts.append("(is_clicker = true OR is_opener = true)")
+        else:
+            if clickers_val == 'true':
+                where_parts.append("is_clicker = true")
+            elif clickers_val == 'false':
+                where_parts.append("is_clicker = false")
+            if openers_val == 'true':
+                where_parts.append("is_opener = true")
+            elif openers_val == 'false':
+                where_parts.append("is_opener = false")
+        # Quality tier filter (high: 70-100, mid: 40-69, low: 0-39)
+        quality_tier = request.args.get('quality_tier')
+        if quality_tier == 'high':
+            where_parts.append("quality_score >= 70")
+        elif quality_tier == 'mid':
+            where_parts.append("quality_score >= 40 AND quality_score < 70")
+        elif quality_tier == 'low':
+            where_parts.append("quality_score < 40")
+        if request.args.get('validation_status'):
+            where_parts.append("validation_status = %s")
+            params.append(request.args.get('validation_status'))
+        
+        # Source tracking filters
+        if request.args.get('data_source'):
+            where_parts.append("data_source = %s")
+            params.append(request.args.get('data_source'))
+        if request.args.get('file_source'):
+            where_parts.append("%s = ANY(file_sources)")
+            params.append(request.args.get('file_source'))
+        if request.args.get('signup_domain'):
+            where_parts.append("LOWER(signup_domain) LIKE %s")
+            params.append(f"%{request.args.get('signup_domain').strip().lower()}%")
+        if request.args.get('signup_ip'):
+            where_parts.append("signup_ip LIKE %s")
+            params.append(f"{request.args.get('signup_ip').strip()}%")
+        if request.args.get('signup_date_from'):
+            where_parts.append("signup_date >= %s")
+            params.append(request.args.get('signup_date_from'))
+        if request.args.get('signup_date_to'):
+            where_parts.append("signup_date <= %s")
+            params.append(request.args.get('signup_date_to'))
         
         where_clause = " AND ".join(where_parts)
         
@@ -2062,12 +3295,13 @@ def api_query():
         cursor.execute(count_sql, params)
         total_count = cursor.fetchone()[0]
         
-        # Get paginated results
+        # Get paginated results with more columns
         limit = min(int(request.args.get('limit', 500)), 5000)
         offset = int(request.args.get('offset', 0))
         
         sql = f"""SELECT email, email_domain, email_provider, email_brand, email_category, 
-                         quality_score, is_clicker, first_name, city, state 
+                         quality_score, is_clicker, is_opener, first_name, last_name, 
+                         city, state, zipcode, phone, gender, signup_date, data_source
                   FROM emails WHERE {where_clause}
                   ORDER BY quality_score DESC NULLS LAST
                   LIMIT {limit} OFFSET {offset}"""
@@ -2126,10 +3360,16 @@ def api_export():
         conn = get_db()
         cursor = conn.cursor()
         
-        # Build WHERE clause
+        # Build WHERE clause with all filter parameters (same as /api/query)
         where_parts = ["1=1"]
         params = []
         
+        # Basic filters
+        if request.args.get('email_search'):
+            email_search = request.args.get('email_search').strip().lower()
+            if email_search:
+                where_parts.append("LOWER(email) LIKE %s")
+                params.append(f"%{email_search}%")
         if request.args.get('provider'):
             where_parts.append("email_provider = %s")
             params.append(request.args.get('provider'))
@@ -2139,26 +3379,99 @@ def api_export():
         if request.args.get('domain'):
             domain = request.args.get('domain').strip().lower()
             if domain:
-                where_parts.append("email_domain LIKE %s")
+                where_parts.append("LOWER(email_domain) LIKE %s")
                 params.append(f"%{domain}%")
-        if request.args.get('min_score'):
-            where_parts.append("quality_score >= %s")
-            params.append(int(request.args.get('min_score')))
         if request.args.get('state'):
-            where_parts.append("state = %s")
-            params.append(request.args.get('state'))
-        if request.args.get('clickers') == 'true':
-            where_parts.append("is_clicker = true")
+            where_parts.append("UPPER(state) = %s")
+            params.append(request.args.get('state').upper())
+        
+        # Personal info filters
+        if request.args.get('first_name'):
+            where_parts.append("LOWER(first_name) LIKE %s")
+            params.append(f"%{request.args.get('first_name').strip().lower()}%")
+        if request.args.get('last_name'):
+            where_parts.append("LOWER(last_name) LIKE %s")
+            params.append(f"%{request.args.get('last_name').strip().lower()}%")
+        if request.args.get('city'):
+            where_parts.append("LOWER(city) LIKE %s")
+            params.append(f"%{request.args.get('city').strip().lower()}%")
+        if request.args.get('zipcode'):
+            where_parts.append("zipcode LIKE %s")
+            params.append(f"{request.args.get('zipcode').strip()}%")
+        if request.args.get('gender'):
+            g = request.args.get('gender')
+            if g == 'M':
+                where_parts.append("(gender = 'M' OR UPPER(gender) = 'MALE')")
+            elif g == 'F':
+                where_parts.append("(gender = 'F' OR UPPER(gender) = 'FEMALE')")
+            else:
+                where_parts.append("gender = %s")
+                params.append(g)
+        if request.args.get('country'):
+            where_parts.append("country = %s")
+            params.append(request.args.get('country'))
+        if request.args.get('has_phone') == 'true':
+            where_parts.append("phone IS NOT NULL AND phone != ''")
+        elif request.args.get('has_phone') == 'false':
+            where_parts.append("(phone IS NULL OR phone = '')")
+        if request.args.get('has_dob') == 'true':
+            where_parts.append("dob IS NOT NULL")
+        elif request.args.get('has_dob') == 'false':
+            where_parts.append("dob IS NULL")
+        
+        # Engagement filters
+        # Clickers/Openers - use OR logic when both are "true"
+        clickers_val = request.args.get('clickers')
+        openers_val = request.args.get('openers')
+        if clickers_val == 'true' and openers_val == 'true':
+            where_parts.append("(is_clicker = true OR is_opener = true)")
+        else:
+            if clickers_val == 'true':
+                where_parts.append("is_clicker = true")
+            elif clickers_val == 'false':
+                where_parts.append("is_clicker = false")
+            if openers_val == 'true':
+                where_parts.append("is_opener = true")
+            elif openers_val == 'false':
+                where_parts.append("is_opener = false")
+        # Quality tier filter (high: 70-100, mid: 40-69, low: 0-39)
+        quality_tier = request.args.get('quality_tier')
+        if quality_tier == 'high':
+            where_parts.append("quality_score >= 70")
+        elif quality_tier == 'mid':
+            where_parts.append("quality_score >= 40 AND quality_score < 70")
+        elif quality_tier == 'low':
+            where_parts.append("quality_score < 40")
+        if request.args.get('validation_status'):
+            where_parts.append("validation_status = %s")
+            params.append(request.args.get('validation_status'))
+        
+        # Source tracking filters
+        if request.args.get('data_source'):
+            where_parts.append("data_source = %s")
+            params.append(request.args.get('data_source'))
         if request.args.get('file_source'):
             where_parts.append("%s = ANY(file_sources)")
             params.append(request.args.get('file_source'))
+        if request.args.get('signup_domain'):
+            where_parts.append("LOWER(signup_domain) LIKE %s")
+            params.append(f"%{request.args.get('signup_domain').strip().lower()}%")
+        if request.args.get('signup_ip'):
+            where_parts.append("signup_ip LIKE %s")
+            params.append(f"{request.args.get('signup_ip').strip()}%")
+        if request.args.get('signup_date_from'):
+            where_parts.append("signup_date >= %s")
+            params.append(request.args.get('signup_date_from'))
+        if request.args.get('signup_date_to'):
+            where_parts.append("signup_date <= %s")
+            params.append(request.args.get('signup_date_to'))
         
         where_clause = " AND ".join(where_parts)
         limit = min(int(request.args.get('limit', 50000)), 100000)
         
         sql = f"""SELECT email, email_domain, email_provider, email_brand, email_category, 
                          quality_score, is_clicker, is_opener, first_name, last_name,
-                         phone, city, state, zipcode
+                         phone, city, state, zipcode, gender, signup_date, data_source
                   FROM emails WHERE {where_clause}
                   ORDER BY quality_score DESC NULLS LAST
                   LIMIT {limit}"""
@@ -2988,6 +4301,20 @@ def api_import_stop():
         return jsonify({'error': str(e)})
 
 
+@app.route('/api/import/reset', methods=['POST'])
+def api_import_reset():
+    """Force reset stuck import state."""
+    imp = get_importer()
+    if not imp:
+        return jsonify({'error': 'Importer module not available'}), 500
+    
+    try:
+        imp.reset_progress()
+        return jsonify({'status': 'reset', 'message': 'Import state reset to idle'})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
 @app.route('/api/file-sources')
 def api_file_sources():
     """Get list of unique file sources."""
@@ -3000,7 +4327,7 @@ def api_file_sources():
             FROM emails
             WHERE file_sources IS NOT NULL
             GROUP BY 1
-            ORDER BY 2 DESC
+            ORDER BY 1 ASC
         """)
         
         sources = [{'filename': row[0], 'email_count': int(row[1])} for row in cursor.fetchall()]
@@ -3010,6 +4337,164 @@ def api_file_sources():
         return jsonify({'sources': sources, 'count': len(sources)})
     except Exception as e:
         return jsonify({'sources': [], 'error': str(e)})
+
+
+@app.route('/api/filters/states')
+def api_filter_states():
+    """Get list of unique states for filter dropdown."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT UPPER(state) as state, COUNT(*) as cnt
+            FROM emails
+            WHERE state IS NOT NULL AND state != ''
+            GROUP BY UPPER(state)
+            ORDER BY cnt DESC
+            LIMIT 100
+        """)
+        states = [{'value': row[0], 'count': int(row[1])} for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+        return jsonify({'states': states})
+    except Exception as e:
+        return jsonify({'states': [], 'error': str(e)})
+
+
+@app.route('/api/filters/countries')
+def api_filter_countries():
+    """Get list of unique countries for filter dropdown."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT country, COUNT(*) as cnt
+            FROM emails
+            WHERE country IS NOT NULL AND country != ''
+            GROUP BY country
+            ORDER BY cnt DESC
+            LIMIT 50
+        """)
+        countries = [{'value': row[0], 'count': int(row[1])} for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+        return jsonify({'countries': countries})
+    except Exception as e:
+        return jsonify({'countries': [], 'error': str(e)})
+
+
+@app.route('/api/filters/data-sources')
+def api_filter_data_sources():
+    """Get list of unique data sources for filter dropdown."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT data_source, COUNT(*) as cnt
+            FROM emails
+            WHERE data_source IS NOT NULL AND data_source != ''
+            GROUP BY data_source
+            ORDER BY cnt DESC
+            LIMIT 100
+        """)
+        sources = [{'value': row[0], 'count': int(row[1])} for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+        return jsonify({'sources': sources})
+    except Exception as e:
+        return jsonify({'sources': [], 'error': str(e)})
+
+
+@app.route('/api/filters/validation-statuses')
+def api_filter_validation_statuses():
+    """Get list of unique validation statuses for filter dropdown."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT validation_status, COUNT(*) as cnt
+            FROM emails
+            WHERE validation_status IS NOT NULL AND validation_status != ''
+            GROUP BY validation_status
+            ORDER BY cnt DESC
+        """)
+        statuses = [{'value': row[0], 'count': int(row[1])} for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+        return jsonify({'statuses': statuses})
+    except Exception as e:
+        return jsonify({'statuses': [], 'error': str(e)})
+
+
+@app.route('/api/filters/genders')
+def api_filter_genders():
+    """Get list of unique genders with counts for filter dropdown."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                CASE 
+                    WHEN UPPER(gender) IN ('M', 'MALE') THEN 'M'
+                    WHEN UPPER(gender) IN ('F', 'FEMALE') THEN 'F'
+                    ELSE gender
+                END as normalized_gender,
+                COUNT(*) as cnt
+            FROM emails
+            WHERE gender IS NOT NULL AND gender != ''
+            GROUP BY normalized_gender
+            ORDER BY cnt DESC
+        """)
+        genders = [{'value': row[0], 'count': int(row[1])} for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+        return jsonify({'genders': genders})
+    except Exception as e:
+        return jsonify({'genders': [], 'error': str(e)})
+
+
+@app.route('/api/filters/cities')
+def api_filter_cities():
+    """Get list of top cities with counts for filter dropdown."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT INITCAP(city) as city, COUNT(*) as cnt
+            FROM emails
+            WHERE city IS NOT NULL AND city != ''
+            GROUP BY INITCAP(city)
+            ORDER BY cnt DESC
+            LIMIT 200
+        """)
+        cities = [{'value': row[0], 'count': int(row[1])} for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+        return jsonify({'cities': cities})
+    except Exception as e:
+        return jsonify({'cities': [], 'error': str(e)})
+
+
+@app.route('/api/filters/zipcodes')
+def api_filter_zipcodes():
+    """Get list of top zipcodes with counts for filter dropdown."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT LEFT(zipcode, 5) as zip5, COUNT(*) as cnt
+            FROM emails
+            WHERE zipcode IS NOT NULL AND zipcode != ''
+            GROUP BY LEFT(zipcode, 5)
+            ORDER BY cnt DESC
+            LIMIT 200
+        """)
+        zipcodes = [{'value': row[0], 'count': int(row[1])} for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+        return jsonify({'zipcodes': zipcodes})
+    except Exception as e:
+        return jsonify({'zipcodes': [], 'error': str(e)})
 
 
 if __name__ == '__main__':

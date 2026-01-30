@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple, Callable, Generator
 from dataclasses import dataclass, field
 
-from config import DATABASE, BATCH_SIZE_LOAD
+from config import DATABASE, BATCH_SIZE_LOAD, BLOCKED_DOMAINS
 from database import get_connection
 from categorizer import get_domain_info
 from cleaner import clean_email, is_valid_email_format as is_valid_email
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # Larger batch size for faster imports (500K vs 100K default)
-IMPORT_BATCH_SIZE = 200_000  # Larger batches for faster imports
+IMPORT_BATCH_SIZE = 1_000_000  # Maximum batch size for extreme speed
 
 # Regex patterns for schema detection
 EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
@@ -142,6 +142,15 @@ def get_progress() -> ImportProgress:
     """Get current import progress."""
     with _import_lock:
         return _import_progress
+
+
+def reset_progress():
+    """Force reset import progress (use when stuck)."""
+    global _import_progress, _stop_requested
+    with _import_lock:
+        _import_progress = ImportProgress()
+        _stop_requested = False
+    return True
 
 
 def request_stop():
@@ -636,6 +645,10 @@ def _parse_row(
     # Extract domain
     email_domain = email.split('@')[-1] if '@' in email else None
     
+    # Skip blocked domains
+    if email_domain and email_domain.lower() in BLOCKED_DOMAINS:
+        return None
+    
     # Get domain info (category, provider, brand)
     domain_info = get_domain_info(email_domain) if email_domain else {}
     
@@ -775,6 +788,25 @@ def _upsert_batch(records: List[Dict[str, Any]]) -> Tuple[int, int]:
         with get_connection() as conn:
             cursor = conn.cursor()
             
+            # Create safe date casting function (handles invalid dates like June 31)
+            cursor.execute("""
+                CREATE OR REPLACE FUNCTION safe_to_date(text) RETURNS DATE AS $$
+                BEGIN
+                    RETURN $1::DATE;
+                EXCEPTION WHEN OTHERS THEN
+                    RETURN NULL;
+                END;
+                $$ LANGUAGE plpgsql IMMUTABLE;
+                
+                CREATE OR REPLACE FUNCTION safe_to_timestamp(text) RETURNS TIMESTAMP AS $$
+                BEGIN
+                    RETURN $1::TIMESTAMP;
+                EXCEPTION WHEN OTHERS THEN
+                    RETURN NULL;
+                END;
+                $$ LANGUAGE plpgsql IMMUTABLE;
+            """)
+            
             # Create temp table with TEXT for all string fields (no length limits)
             cursor.execute("""
                 DROP TABLE IF EXISTS import_staging;
@@ -846,19 +878,13 @@ def _upsert_batch(records: List[Dict[str, Any]]) -> Tuple[int, int]:
                     LEFT(state, 50),
                     LEFT(zipcode, 20),
                     LEFT(phone, 50),
-                    CASE 
-                        WHEN LEFT(dob, 10) ~ '^\\d{4}-\\d{2}-\\d{2}$' AND LEFT(dob, 10) != '0000-00-00' THEN LEFT(dob, 10)::DATE 
-                        ELSE NULL 
-                    END,
+                    safe_to_date(CASE WHEN LEFT(dob, 10) != '0000-00-00' THEN LEFT(dob, 10) ELSE NULL END),
                     CASE 
                         WHEN UPPER(gender) IN ('MALE', 'M') THEN 'M'
                         WHEN UPPER(gender) IN ('FEMALE', 'F') THEN 'F'
                         ELSE LEFT(gender, 1)
                     END,
-                    CASE 
-                        WHEN LEFT(signup_date, 10) ~ '^\\d{4}-\\d{2}-\\d{2}$' AND LEFT(signup_date, 10) != '0000-00-00' THEN LEFT(signup_date, 10)::TIMESTAMP 
-                        ELSE NULL 
-                    END,
+                    safe_to_timestamp(CASE WHEN LEFT(signup_date, 10) != '0000-00-00' THEN LEFT(signup_date, 10) ELSE NULL END),
                     LEFT(signup_domain, 255),
                     LEFT(signup_ip, 45),
                     is_clicker, is_opener,
