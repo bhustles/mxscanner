@@ -460,12 +460,21 @@ DASHBOARD_HTML = """
             <div class="mx-controls">
                 <label style="margin-right: 10px; color: #888;">Workers:</label>
                 <select id="mx-workers" style="margin-right: 15px; padding: 6px 10px; background: #1a1a2e; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                    <option value="8">8</option>
-                    <option value="12" selected>12</option>
                     <option value="16">16</option>
-                    <option value="24">24</option>
                     <option value="32">32</option>
-                    <option value="64">64</option>
+                    <option value="48">48</option>
+                    <option value="64" selected>64</option>
+                    <option value="76">76</option>
+                    <option value="88">88</option>
+                    <option value="100">100</option>
+                    <option value="112">112</option>
+                    <option value="124">124</option>
+                    <option value="136">136</option>
+                    <option value="148">148</option>
+                    <option value="160">160</option>
+                    <option value="176">176</option>
+                    <option value="188">188</option>
+                    <option value="200">200</option>
                 </select>
                 <button type="button" class="btn-start" id="mx-start-btn" onclick="startMxScan()">Start Scan</button>
                 <button type="button" style="background: #ffc107; color: #000;" id="mx-reset-dead-only-btn" onclick="resetDeadOnly()" title="Reset dead domains to unchecked (no scan)">Reset dead only</button>
@@ -896,6 +905,8 @@ DASHBOARD_HTML = """
             }
         }
         
+        var dnsStatsLocked = false;  // When true, don't load from DB API
+        
         function resetDnsStats() {
             for (var server in dnsServerStats) {
                 dnsServerStats[server].valid = 0;
@@ -904,7 +915,8 @@ DASHBOARD_HTML = """
             updateDnsServerDisplay();
             flushCount = 0;
             totalFlushed = 0;
-            console.log('DNS stats and flush counters reset');
+            dnsStatsLocked = true;  // Prevent API from overwriting
+            console.log('DNS stats cleared and locked (will only show new results)');
         }
         
         // Auto-reset DNS stats on page load
@@ -1305,19 +1317,22 @@ DASHBOARD_HTML = """
             .catch(function() {});
             
             // Load persisted DNS server stats from DB (survives restart)
-            fetch('/api/mx/dns-stats')
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                var servers = data.servers || {};
-                for (var name in servers) {
-                    if (dnsServerStats[name]) {
-                        dnsServerStats[name].valid = servers[name].valid || 0;
-                        dnsServerStats[name].dead = servers[name].dead || 0;
+            // Skip if stats were manually cleared (dnsStatsLocked)
+            if (!dnsStatsLocked) {
+                fetch('/api/mx/dns-stats')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var servers = data.servers || {};
+                    for (var name in servers) {
+                        if (dnsServerStats[name]) {
+                            dnsServerStats[name].valid = servers[name].valid || 0;
+                            dnsServerStats[name].dead = servers[name].dead || 0;
+                        }
                     }
-                }
-                updateDnsServerDisplay();
-            })
-            .catch(function() {});
+                    updateDnsServerDisplay();
+                })
+                .catch(function() {});
+            }
         }
         
         // Check status when MX tab is shown

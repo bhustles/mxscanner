@@ -44,22 +44,24 @@ def _get_resolver(server: str, timeout: float) -> dns.resolver.Resolver:
     return _thread_local.resolvers[server]
 
 
-def resolve_mx(domain: str, timeout: float = 2.0, max_retries: int = 2) -> Tuple[Optional[List[tuple]], Optional[str]]:
+def resolve_mx(domain: str, timeout: float = 0.5) -> Tuple[Optional[List[tuple]], Optional[str]]:
     """
     Resolve MX records - LOCK-FREE, high performance.
-    Retries with different DNS servers on timeout/error.
+    
     Returns:
         Tuple of (mx_records, dns_server_used)
     """
     global _server_index
     
+    # Get next server (no lock - race condition is fine, just distributes load)
+    idx = _server_index
+    _server_index = (idx + 1) % len(DNS_SERVERS)
+    
     last_server = None
     
-    for attempt in range(max_retries):
-        # Get next server (no lock - race condition is fine, just distributes load)
-        idx = _server_index
-        _server_index = (idx + 1) % len(DNS_SERVERS)
-        server = DNS_SERVERS[idx % len(DNS_SERVERS)]
+    # Try up to 2 servers
+    for attempt in range(2):
+        server = DNS_SERVERS[(idx + attempt) % len(DNS_SERVERS)]
         last_server = server
         
         try:
@@ -72,28 +74,27 @@ def resolve_mx(domain: str, timeout: float = 2.0, max_retries: int = 2) -> Tuple
             return (mx_records, server)
             
         except dns.resolver.NXDOMAIN:
-            # Domain definitely doesn't exist - no retry needed
+            # Domain doesn't exist - verify with one more server
+            if attempt < 1:
+                continue
             return (None, server)
         except dns.resolver.NoAnswer:
-            # Domain exists but no MX records - no retry needed
             return ([], server)
         except (dns.resolver.NoNameservers, dns.exception.Timeout, Exception):
-            # Timeout or error - try next server
             continue
     
-    # All retries failed
     return (None, last_server)
 
 
 # Legacy compatibility
 class DNSPool:
     """Legacy wrapper - just calls the lock-free function."""
-    def __init__(self, servers=None, timeout=2.0):
+    def __init__(self, servers=None, timeout=0.5):
         self.timeout = timeout
         self.servers = servers or DNS_SERVERS
     
     def resolve_mx(self, domain: str):
-        return resolve_mx(domain, self.timeout, max_retries=2)
+        return resolve_mx(domain, self.timeout)
     
     def get_stats(self):
         return {'total_requests': 0, 'errors': 0, 'servers_count': len(DNS_SERVERS)}
