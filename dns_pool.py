@@ -75,7 +75,8 @@ def resolve_mx(domain: str, timeout: float = 1.5) -> Tuple[Optional[List[tuple]]
     idx = _server_index
     _server_index = (idx + 1) % len(DNS_SERVERS)
     
-    last_server = None
+    # Default to first server in rotation (never return None for server)
+    last_server = DNS_SERVERS[idx % len(DNS_SERVERS)]
     servers_tried = 0
     
     # Try up to 4 servers (skip those on cooldown)
@@ -85,8 +86,8 @@ def resolve_mx(domain: str, timeout: float = 1.5) -> Tuple[Optional[List[tuple]]
             
         server = DNS_SERVERS[(idx + offset) % len(DNS_SERVERS)]
         
-        # Skip servers on cooldown (unless we've tried all available)
-        if not _is_server_available(server):
+        # Skip servers on cooldown (but if we haven't tried any, use it anyway)
+        if not _is_server_available(server) and servers_tried > 0:
             continue
         
         servers_tried += 1
