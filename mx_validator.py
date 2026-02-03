@@ -995,7 +995,7 @@ def run_validation(workers: int = 16, batch_size: int = 2000, resume: bool = Tru
     return get_state()
 
 
-def start_validation_async(workers: int = 32, resume: bool = True):
+def start_validation_async(workers: int = 12, resume: bool = True):
     """Start validation in a background thread."""
     global _state
     print(f"=== START_VALIDATION_ASYNC called with workers={workers}, resume={resume} ===", flush=True)
@@ -1068,7 +1068,7 @@ def reset_dead_domains() -> int:
     return count
 
 
-def start_dead_rescan_async(workers: int = 32) -> tuple:
+def start_dead_rescan_async(workers: int = 12) -> tuple:
     """
     Reset dead domains and start rescanning them.
     
