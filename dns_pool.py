@@ -4,6 +4,7 @@ High-performance DNS resolution with minimal thread contention
 """
 
 import random
+import time
 from typing import Optional, List, Tuple
 import dns.resolver
 import threading
@@ -21,11 +22,27 @@ DNS_SERVERS = [
     '64.6.64.6', '64.6.65.6',       # Verisign
 ]
 
+# Cooldown tracking - servers that timed out won't be used for COOLDOWN_SECONDS
+COOLDOWN_SECONDS = 4.0
+_server_cooldowns = {}  # server -> timestamp when cooldown expires
+
 # Thread-local storage for per-thread resolvers (avoids creating new ones)
 _thread_local = threading.local()
 
 # Simple atomic counter for round-robin (race conditions OK - just for distribution)
 _server_index = 0
+
+
+def _is_server_available(server: str) -> bool:
+    """Check if server is available (not in cooldown)."""
+    if server not in _server_cooldowns:
+        return True
+    return time.time() >= _server_cooldowns[server]
+
+
+def _put_server_on_cooldown(server: str):
+    """Put a server on cooldown after a timeout."""
+    _server_cooldowns[server] = time.time() + COOLDOWN_SECONDS
 
 
 def _get_resolver(server: str, timeout: float) -> dns.resolver.Resolver:
@@ -47,6 +64,7 @@ def _get_resolver(server: str, timeout: float) -> dns.resolver.Resolver:
 def resolve_mx(domain: str, timeout: float = 1.5) -> Tuple[Optional[List[tuple]], Optional[str]]:
     """
     Resolve MX records - LOCK-FREE, high performance.
+    Servers that timeout are put on 4-second cooldown.
     
     Returns:
         Tuple of (mx_records, dns_server_used)
@@ -58,14 +76,24 @@ def resolve_mx(domain: str, timeout: float = 1.5) -> Tuple[Optional[List[tuple]]
     _server_index = (idx + 1) % len(DNS_SERVERS)
     
     last_server = None
+    servers_tried = 0
     
-    # Try up to 3 servers with increasing timeout
-    for attempt in range(3):
-        server = DNS_SERVERS[(idx + attempt) % len(DNS_SERVERS)]
+    # Try up to 4 servers (skip those on cooldown)
+    for offset in range(len(DNS_SERVERS)):
+        if servers_tried >= 3:
+            break
+            
+        server = DNS_SERVERS[(idx + offset) % len(DNS_SERVERS)]
+        
+        # Skip servers on cooldown (unless we've tried all available)
+        if not _is_server_available(server):
+            continue
+        
+        servers_tried += 1
         last_server = server
         
         # Increase timeout slightly on retries
-        attempt_timeout = timeout + (attempt * 0.5)
+        attempt_timeout = timeout + (servers_tried - 1) * 0.5
         
         try:
             resolver = _get_resolver(server, attempt_timeout)
@@ -78,12 +106,16 @@ def resolve_mx(domain: str, timeout: float = 1.5) -> Tuple[Optional[List[tuple]]
             
         except dns.resolver.NXDOMAIN:
             # Domain doesn't exist - verify with one more server
-            if attempt < 1:
+            if servers_tried < 2:
                 continue
             return (None, server)
         except dns.resolver.NoAnswer:
             return ([], server)
-        except (dns.resolver.NoNameservers, dns.exception.Timeout, Exception):
+        except dns.exception.Timeout:
+            # Timeout - put this server on cooldown
+            _put_server_on_cooldown(server)
+            continue
+        except (dns.resolver.NoNameservers, Exception):
             continue
     
     return (None, last_server)
