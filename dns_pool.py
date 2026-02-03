@@ -106,8 +106,8 @@ def resolve_mx(domain: str, timeout: float = 1.5) -> Tuple[Optional[List[tuple]]
             return (mx_records, server)
             
         except dns.resolver.NXDOMAIN:
-            # Domain doesn't exist - verify with one more server
-            if servers_tried < 2:
+            # Domain doesn't exist - verify with 2 more servers (3 total)
+            if servers_tried < 3:
                 continue
             return (None, server)
         except dns.resolver.NoAnswer:
