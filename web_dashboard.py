@@ -4267,6 +4267,9 @@ def api_query():
         where_parts = ["1=1"]
         params = []
         
+        # ALWAYS exclude spamtraps from query results
+        where_parts.append("(is_spamtrap IS NULL OR is_spamtrap = FALSE)")
+        
         # Basic filters
         if request.args.get('email_search'):
             email_search = request.args.get('email_search').strip().lower()
@@ -4447,6 +4450,9 @@ def api_export():
         # Build WHERE clause with all filter parameters (same as /api/query)
         where_parts = ["1=1"]
         params = []
+        
+        # ALWAYS exclude spamtraps - never export them
+        where_parts.append("(is_spamtrap IS NULL OR is_spamtrap = FALSE)")
         
         # Basic filters
         if request.args.get('email_search'):
