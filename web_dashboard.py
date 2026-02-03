@@ -261,9 +261,11 @@ DASHBOARD_HTML = """
         
         <p style="color: #666; font-size: 0.85em; margin-bottom: 12px;">
             Cache updated: <span id="stats-updated">-</span> | 
-            <button onclick="loadDetailedStats()" style="font-size: 12px; padding: 2px 8px;">Load Cached Stats</button>
+            <button onclick="loadDetailedStats(false)" style="font-size: 12px; padding: 2px 8px;">Load Cached Stats</button>
             <button onclick="recalculateStats()" style="font-size: 12px; padding: 2px 8px; margin-left: 5px; background: #fd7e14;">Recalculate (slow)</button>
+            <button onclick="clearDeltas()" id="clear-deltas-btn" style="font-size: 12px; padding: 2px 8px; margin-left: 5px; background: #6c757d; display: none;">Clear Deltas</button>
             <span id="stats-loading" style="display:none; color: #ffc107; margin-left: 10px;">Loading...</span>
+            <span id="delta-indicator" style="display:none; color: #28a745; margin-left: 10px; font-weight: bold;">Showing changes (+/-)</span>
         </p>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -1893,9 +1895,25 @@ DASHBOARD_HTML = """
             window.location.href = '/api/export?' + params;
         }
         
+        // Store previous stats for delta comparison
+        var cachedStatsData = null;
+        var showingDeltas = false;
+        
+        // Helper to format delta values
+        function formatDelta(newVal, oldVal) {
+            if (oldVal === null || oldVal === undefined) return '';
+            var diff = newVal - oldVal;
+            if (diff === 0) return '';
+            var sign = diff > 0 ? '+' : '';
+            var color = diff > 0 ? '#28a745' : '#dc3545';
+            return ' <span style="color: ' + color + '; font-size: 0.8em;">(' + sign + formatNum(diff) + ')</span>';
+        }
+        
         // Load detailed stats for Stats tab
-        function loadDetailedStats() {
+        function loadDetailedStats(showDeltas) {
             document.getElementById('stats-loading').style.display = 'inline';
+            var previousData = showDeltas ? cachedStatsData : null;
+            
             fetch('/api/stats/detailed')
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -1904,6 +1922,11 @@ DASHBOARD_HTML = """
                     console.error('Stats error:', data.error, data.trace);
                     alert('Error loading stats: ' + data.error);
                     return;
+                }
+                
+                // Store for future delta comparison (only when not showing deltas)
+                if (!showDeltas) {
+                    cachedStatsData = JSON.parse(JSON.stringify(data));
                 }
                 
                 // Update timestamp from cache
@@ -1915,106 +1938,116 @@ DASHBOARD_HTML = """
                 }
                 
                 // Summary totals - use helper to avoid null errors
-                function setStatText(id, val) {
+                function setStatText(id, val, dataKey) {
                     var el = document.getElementById(id);
-                    if (el) el.textContent = val;
+                    if (el) {
+                        el.innerHTML = val;
+                        // Show delta if we have previous data
+                        if (previousData && dataKey) {
+                            var oldVal = previousData[dataKey];
+                            var newVal = data[dataKey];
+                            if (oldVal !== undefined && newVal !== undefined) {
+                                el.innerHTML = val + formatDelta(newVal, oldVal);
+                            }
+                        }
+                    }
                 }
                 
-                setStatText('stat-total', formatNum(data.total));
-                setStatText('stat-good-total', formatNum(data.good_total));
-                setStatText('stat-dead-total', formatNum(data.dead_total));
+                setStatText('stat-total', formatNum(data.total), 'total');
+                setStatText('stat-good-total', formatNum(data.good_total), 'good_total');
+                setStatText('stat-dead-total', formatNum(data.dead_total), 'dead_total');
                 
                 // Clickers & Openers totals
-                setStatText('stat-clickers', formatNum(data.clickers));
-                setStatText('stat-openers', formatNum(data.openers));
+                setStatText('stat-clickers', formatNum(data.clickers), 'clickers');
+                setStatText('stat-openers', formatNum(data.openers), 'openers');
                 
                 // Big4 row
-                setStatText('stat-big4-total', formatNum(data.big4_total));
-                setStatText('stat-big4-good', formatNum(data.big4_good));
-                setStatText('stat-big4-dead', formatNum(data.big4_dead));
-                setStatText('stat-clickers-big4', formatNum(data.clickers_big4));
-                setStatText('stat-openers-big4', formatNum(data.openers_big4));
+                setStatText('stat-big4-total', formatNum(data.big4_total), 'big4_total');
+                setStatText('stat-big4-good', formatNum(data.big4_good), 'big4_good');
+                setStatText('stat-big4-dead', formatNum(data.big4_dead), 'big4_dead');
+                setStatText('stat-clickers-big4', formatNum(data.clickers_big4), 'clickers_big4');
+                setStatText('stat-openers-big4', formatNum(data.openers_big4), 'openers_big4');
                 
                 // Cable row
-                setStatText('stat-cable-total', formatNum(data.cable_total));
-                setStatText('stat-cable-good', formatNum(data.cable_good));
-                setStatText('stat-cable-dead', formatNum(data.cable_dead));
-                setStatText('stat-clickers-cable', formatNum(data.clickers_cable));
-                setStatText('stat-openers-cable', formatNum(data.openers_cable));
+                setStatText('stat-cable-total', formatNum(data.cable_total), 'cable_total');
+                setStatText('stat-cable-good', formatNum(data.cable_good), 'cable_good');
+                setStatText('stat-cable-dead', formatNum(data.cable_dead), 'cable_dead');
+                setStatText('stat-clickers-cable', formatNum(data.clickers_cable), 'clickers_cable');
+                setStatText('stat-openers-cable', formatNum(data.openers_cable), 'openers_cable');
                 
                 // GI row
-                setStatText('stat-gi-total', formatNum(data.gi_total));
-                setStatText('stat-gi-good', formatNum(data.gi_good));
-                setStatText('stat-gi-dead', formatNum(data.gi_dead));
-                setStatText('stat-clickers-gi', formatNum(data.clickers_gi));
-                setStatText('stat-openers-gi', formatNum(data.openers_gi));
+                setStatText('stat-gi-total', formatNum(data.gi_total), 'gi_total');
+                setStatText('stat-gi-good', formatNum(data.gi_good), 'gi_good');
+                setStatText('stat-gi-dead', formatNum(data.gi_dead), 'gi_dead');
+                setStatText('stat-clickers-gi', formatNum(data.clickers_gi), 'clickers_gi');
+                setStatText('stat-openers-gi', formatNum(data.openers_gi), 'openers_gi');
                 
                 // Big4 breakdown - full stats for each (Total, Good, Dead, High, Med, Low, Click, Open, Doms)
                 var big4Providers = ['gmail', 'yahoo', 'outlook'];
                 big4Providers.forEach(function(p) {
-                    setStatText('stat-' + p, formatNum(data[p]));
-                    setStatText('stat-' + p + '-good', formatNum(data[p + '_good']));
-                    setStatText('stat-' + p + '-dead', formatNum(data[p + '_dead']));
-                    setStatText('stat-' + p + '-high', formatNum(data[p + '_high']));
-                    setStatText('stat-' + p + '-med', formatNum(data[p + '_med']));
-                    setStatText('stat-' + p + '-low', formatNum(data[p + '_low']));
-                    setStatText('stat-' + p + '-click', formatNum(data[p + '_click']));
-                    setStatText('stat-' + p + '-open', formatNum(data[p + '_open']));
-                    setStatText('stat-' + p + '-domains', formatNum(data[p + '_domains']));
+                    setStatText('stat-' + p, formatNum(data[p]), p);
+                    setStatText('stat-' + p + '-good', formatNum(data[p + '_good']), p + '_good');
+                    setStatText('stat-' + p + '-dead', formatNum(data[p + '_dead']), p + '_dead');
+                    setStatText('stat-' + p + '-high', formatNum(data[p + '_high']), p + '_high');
+                    setStatText('stat-' + p + '-med', formatNum(data[p + '_med']), p + '_med');
+                    setStatText('stat-' + p + '-low', formatNum(data[p + '_low']), p + '_low');
+                    setStatText('stat-' + p + '-click', formatNum(data[p + '_click']), p + '_click');
+                    setStatText('stat-' + p + '-open', formatNum(data[p + '_open']), p + '_open');
+                    setStatText('stat-' + p + '-domains', formatNum(data[p + '_domains']), p + '_domains');
                 });
                 
                 // Cable Provider breakdown
                 var cableProviders = ['comcast', 'spectrum', 'centurylink', 'earthlink', 'windstream', 'optimum'];
                 cableProviders.forEach(function(p) {
-                    setStatText('stat-' + p, formatNum(data[p]));
-                    setStatText('stat-' + p + '-good', formatNum(data[p + '_good']));
-                    setStatText('stat-' + p + '-dead', formatNum(data[p + '_dead']));
-                    setStatText('stat-' + p + '-high', formatNum(data[p + '_high']));
-                    setStatText('stat-' + p + '-med', formatNum(data[p + '_med']));
-                    setStatText('stat-' + p + '-low', formatNum(data[p + '_low']));
-                    setStatText('stat-' + p + '-click', formatNum(data[p + '_click']));
-                    setStatText('stat-' + p + '-open', formatNum(data[p + '_open']));
-                    setStatText('stat-' + p + '-domains', formatNum(data[p + '_domains']));
+                    setStatText('stat-' + p, formatNum(data[p]), p);
+                    setStatText('stat-' + p + '-good', formatNum(data[p + '_good']), p + '_good');
+                    setStatText('stat-' + p + '-dead', formatNum(data[p + '_dead']), p + '_dead');
+                    setStatText('stat-' + p + '-high', formatNum(data[p + '_high']), p + '_high');
+                    setStatText('stat-' + p + '-med', formatNum(data[p + '_med']), p + '_med');
+                    setStatText('stat-' + p + '-low', formatNum(data[p + '_low']), p + '_low');
+                    setStatText('stat-' + p + '-click', formatNum(data[p + '_click']), p + '_click');
+                    setStatText('stat-' + p + '-open', formatNum(data[p + '_open']), p + '_open');
+                    setStatText('stat-' + p + '-domains', formatNum(data[p + '_domains']), p + '_domains');
                 });
                 
                 // 2nd Level Big4 - main table row
-                setStatText('stat-2nd-big4-total', formatNum(data['2nd_big4_total']));
-                setStatText('stat-2nd-big4-good', formatNum(data['2nd_big4_good']));
-                setStatText('stat-2nd-big4-dead', formatNum(data['2nd_big4_dead']));
-                setStatText('stat-2nd-big4-clickers', formatNum(data['2nd_big4_clickers']));
-                setStatText('stat-2nd-big4-openers', formatNum(data['2nd_big4_openers']));
+                setStatText('stat-2nd-big4-total', formatNum(data['2nd_big4_total']), '2nd_big4_total');
+                setStatText('stat-2nd-big4-good', formatNum(data['2nd_big4_good']), '2nd_big4_good');
+                setStatText('stat-2nd-big4-dead', formatNum(data['2nd_big4_dead']), '2nd_big4_dead');
+                setStatText('stat-2nd-big4-clickers', formatNum(data['2nd_big4_clickers']), '2nd_big4_clickers');
+                setStatText('stat-2nd-big4-openers', formatNum(data['2nd_big4_openers']), '2nd_big4_openers');
                 
                 // 2nd Level Big4 - breakdown with all columns
                 var big4Hosted = ['google-hosted', 'microsoft-hosted', 'yahoo-hosted'];
                 big4Hosted.forEach(function(p) {
                     var key = p.replace('-', '_');
-                    setStatText('stat-' + p, formatNum(data[key]));
-                    setStatText('stat-' + p + '-good', formatNum(data[key + '_good']));
-                    setStatText('stat-' + p + '-dead', formatNum(data[key + '_dead']));
-                    setStatText('stat-' + p + '-high', formatNum(data[key + '_high']));
-                    setStatText('stat-' + p + '-med', formatNum(data[key + '_med']));
-                    setStatText('stat-' + p + '-low', formatNum(data[key + '_low']));
-                    setStatText('stat-' + p + '-click', formatNum(data[key + '_click']));
-                    setStatText('stat-' + p + '-open', formatNum(data[key + '_open']));
-                    setStatText('stat-' + p + '-domains', formatNum(data[key + '_domains']));
+                    setStatText('stat-' + p, formatNum(data[key]), key);
+                    setStatText('stat-' + p + '-good', formatNum(data[key + '_good']), key + '_good');
+                    setStatText('stat-' + p + '-dead', formatNum(data[key + '_dead']), key + '_dead');
+                    setStatText('stat-' + p + '-high', formatNum(data[key + '_high']), key + '_high');
+                    setStatText('stat-' + p + '-med', formatNum(data[key + '_med']), key + '_med');
+                    setStatText('stat-' + p + '-low', formatNum(data[key + '_low']), key + '_low');
+                    setStatText('stat-' + p + '-click', formatNum(data[key + '_click']), key + '_click');
+                    setStatText('stat-' + p + '-open', formatNum(data[key + '_open']), key + '_open');
+                    setStatText('stat-' + p + '-domains', formatNum(data[key + '_domains']), key + '_domains');
                 });
                 
                 // GI Hosting providers - full stats for each
                 var giProviders = ['apple', 'godaddy', '1and1', 'hostgator', 'namecheap', 'zoho', 'fastmail', 'amazonses', 'protonmail', 'cloudflare'];
                 giProviders.forEach(function(p) {
-                    setStatText('stat-' + p, formatNum(data[p]));
-                    setStatText('stat-' + p + '-good', formatNum(data[p + '_good']));
-                    setStatText('stat-' + p + '-dead', formatNum(data[p + '_dead']));
-                    setStatText('stat-' + p + '-high', formatNum(data[p + '_high']));
-                    setStatText('stat-' + p + '-med', formatNum(data[p + '_med']));
-                    setStatText('stat-' + p + '-low', formatNum(data[p + '_low']));
-                    setStatText('stat-' + p + '-click', formatNum(data[p + '_click']));
-                    setStatText('stat-' + p + '-open', formatNum(data[p + '_open']));
-                    setStatText('stat-' + p + '-domains', formatNum(data[p + '_domains']));
+                    setStatText('stat-' + p, formatNum(data[p]), p);
+                    setStatText('stat-' + p + '-good', formatNum(data[p + '_good']), p + '_good');
+                    setStatText('stat-' + p + '-dead', formatNum(data[p + '_dead']), p + '_dead');
+                    setStatText('stat-' + p + '-high', formatNum(data[p + '_high']), p + '_high');
+                    setStatText('stat-' + p + '-med', formatNum(data[p + '_med']), p + '_med');
+                    setStatText('stat-' + p + '-low', formatNum(data[p + '_low']), p + '_low');
+                    setStatText('stat-' + p + '-click', formatNum(data[p + '_click']), p + '_click');
+                    setStatText('stat-' + p + '-open', formatNum(data[p + '_open']), p + '_open');
+                    setStatText('stat-' + p + '-domains', formatNum(data[p + '_domains']), p + '_domains');
                 });
                 
                 // GI domains count
-                setStatText('stat-gi-domains', formatNum(data.gi_domains));
+                setStatText('stat-gi-domains', formatNum(data.gi_domains), 'gi_domains');
                 
                 // Top 10 GI Domains
                 var tbody = document.getElementById('top-gi-domains-body');
@@ -2044,6 +2077,10 @@ DASHBOARD_HTML = """
         
         // Recalculate stats (slow - updates cache)
         function recalculateStats() {
+            if (!cachedStatsData) {
+                alert('Please click "Load Cached Stats" first to see the delta comparison.');
+                return;
+            }
             if (!confirm('This will recalculate all stats from the database.\\nThis takes about 10 seconds. Continue?')) return;
             document.getElementById('stats-loading').style.display = 'inline';
             document.getElementById('stats-loading').textContent = 'Recalculating...';
@@ -2052,8 +2089,11 @@ DASHBOARD_HTML = """
             .then(function(data) {
                 document.getElementById('stats-loading').style.display = 'none';
                 if (data.success) {
-                    alert('Stats recalculated! ' + data.stats_updated + ' stats updated.');
-                    loadDetailedStats();
+                    // Load new stats with delta comparison
+                    loadDetailedStats(true);
+                    // Show delta indicator and clear button
+                    document.getElementById('delta-indicator').style.display = 'inline';
+                    document.getElementById('clear-deltas-btn').style.display = 'inline';
                 } else {
                     alert('Error: ' + (data.error || 'Unknown error'));
                 }
@@ -2062,6 +2102,14 @@ DASHBOARD_HTML = """
                 document.getElementById('stats-loading').style.display = 'none';
                 alert('Error recalculating stats: ' + e);
             });
+        }
+        
+        // Clear delta display and reload fresh stats
+        function clearDeltas() {
+            document.getElementById('delta-indicator').style.display = 'none';
+            document.getElementById('clear-deltas-btn').style.display = 'none';
+            cachedStatsData = null;
+            loadDetailedStats(false);
         }
         
         // Load stats when Stats tab is shown
