@@ -218,6 +218,14 @@ DASHBOARD_HTML = """
         .mx-stat-value { font-size: 1.8em; font-weight: bold; color: #00d4ff; }
         .mx-stat-label { font-size: 0.85em; color: #888; }
         
+        /* Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .3s; border-radius: 26px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: #666; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: #00d4ff; }
+        input:checked + .slider:before { transform: translateX(24px); background-color: #fff; }
+        
         .mx-controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
         .mx-controls button { padding: 10px 20px; }
         .btn-start { background: #28a745; }
@@ -244,6 +252,8 @@ DASHBOARD_HTML = """
             <button type="button" class="tab-btn active" onclick="showTab('mx')">MX Validator</button>
             <button type="button" class="tab-btn" onclick="showTab('import')">Import Data</button>
             <button type="button" class="tab-btn" onclick="showTab('config')">Domain Config</button>
+            <button type="button" class="tab-btn" onclick="showTab('cloudflare')">Cloudflare</button>
+            <button type="button" class="tab-btn" onclick="showTab('reputation')">Domain Reputation</button>
         </div>
         
         <!-- STATS TAB -->
@@ -692,6 +702,79 @@ DASHBOARD_HTML = """
                 </div>
             </div>
             
+            <!-- LIST BUILDER -->
+            <div class="filter-section" style="background: #0d2137; border: 2px solid #00d4ff; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                <h4 style="color: #00d4ff; margin: 0 0 15px 0;">List Builder - Combine Multiple Segments</h4>
+                
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+                    <select id="list-builder-preset" style="padding: 8px; min-width: 200px;">
+                        <optgroup label="By Category">
+                            <option value="all_clickers">ALL Clickers</option>
+                            <option value="all_openers">ALL Openers</option>
+                            <option value="gi_clickers">GI Clickers</option>
+                            <option value="gi_openers">GI Openers</option>
+                            <option value="cable_clickers">Cable Provider Clickers</option>
+                            <option value="cable_openers">Cable Provider Openers</option>
+                            <option value="big4_clickers">Big4 ISP Clickers</option>
+                            <option value="big4_openers">Big4 ISP Openers</option>
+                        </optgroup>
+                        <optgroup label="Big4 ISP Providers">
+                            <option value="google_clickers">Google/Gmail Clickers</option>
+                            <option value="google_openers">Google/Gmail Openers</option>
+                            <option value="yahoo_clickers">Yahoo Clickers</option>
+                            <option value="yahoo_openers">Yahoo Openers</option>
+                            <option value="microsoft_clickers">Microsoft/Outlook Clickers</option>
+                            <option value="microsoft_openers">Microsoft/Outlook Openers</option>
+                            <option value="aol_clickers">AOL Clickers</option>
+                            <option value="aol_openers">AOL Openers</option>
+                        </optgroup>
+                        <optgroup label="2nd Level Big4 (GI on Big4 MX)">
+                            <option value="2nd_google_clickers">GI on Google MX - Clickers</option>
+                            <option value="2nd_google_openers">GI on Google MX - Openers</option>
+                            <option value="2nd_microsoft_clickers">GI on Microsoft MX - Clickers</option>
+                            <option value="2nd_microsoft_openers">GI on Microsoft MX - Openers</option>
+                            <option value="2nd_yahoo_clickers">GI on Yahoo MX - Clickers</option>
+                            <option value="2nd_yahoo_openers">GI on Yahoo MX - Openers</option>
+                            <option value="2nd_big4_all_clickers">All 2nd Level Big4 Clickers</option>
+                            <option value="2nd_big4_all_openers">All 2nd Level Big4 Openers</option>
+                        </optgroup>
+                        <optgroup label="Cable/Other Providers">
+                            <option value="apple_clickers">Apple/iCloud Clickers</option>
+                            <option value="apple_openers">Apple/iCloud Openers</option>
+                            <option value="spectrum_clickers">Spectrum Clickers</option>
+                            <option value="spectrum_openers">Spectrum Openers</option>
+                            <option value="comcast_clickers">Comcast/Xfinity Clickers</option>
+                            <option value="comcast_openers">Comcast/Xfinity Openers</option>
+                            <option value="att_clickers">AT&T Clickers</option>
+                            <option value="att_openers">AT&T Openers</option>
+                            <option value="godaddy_clickers">GoDaddy Clickers</option>
+                            <option value="earthlink_clickers">EarthLink Clickers</option>
+                        </optgroup>
+                        <optgroup label="Quality Tiers">
+                            <option value="high_quality">High Quality (70+)</option>
+                            <option value="med_quality">Medium Quality (40-69)</option>
+                            <option value="verified_all">All Verified</option>
+                        </optgroup>
+                    </select>
+                    <button onclick="addToListBuilder()" style="background: #17a2b8;">+ Add Segment</button>
+                    <button onclick="addCurrentFilters()" style="background: #6c757d;">+ Add Current Filters</button>
+                </div>
+                
+                <div id="list-builder-segments" style="min-height: 40px; background: #1a1a2e; border-radius: 5px; padding: 10px; margin-bottom: 10px;">
+                    <span style="color: #666; font-size: 12px;">No segments added yet. Select presets above or use "Add Current Filters".</span>
+                </div>
+                
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button onclick="clearListBuilder()" style="background: #dc3545; font-size: 12px;">Clear All</button>
+                    <button onclick="previewListBuilder()" style="background: #ffc107; color: #000; font-size: 12px;">Preview Count</button>
+                    <button onclick="exportListBuilder()" style="background: #28a745; font-size: 12px;">Export Combined List</button>
+                    <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; color: #888; cursor: pointer;">
+                        <input type="checkbox" id="export-email-only" style="cursor: pointer;"> Email only
+                    </label>
+                    <span id="list-builder-count" style="color: #888; font-size: 12px;"></span>
+                </div>
+            </div>
+            
             <!-- Action Buttons -->
             <div style="margin-top: 15px;">
                 <button onclick="runQuery(1)">Search</button>
@@ -1045,6 +1128,96 @@ DASHBOARD_HTML = """
         </div>
         </div><!-- END CONFIG TAB -->
         
+        <!-- CLOUDFLARE TAB -->
+        <div id="tab-cloudflare" class="tab-content">
+        <div class="section">
+            <h2>Cloudflare Security Manager</h2>
+            <p style="color: #888; margin-bottom: 15px;">Manage security settings per domain. Toggle features on/off with one click.</p>
+            
+            <button onclick="loadCloudflareZones()" style="margin-bottom: 20px;">Refresh Zones</button>
+            
+            <div id="cf-zones-container">
+                <p style="color: #666;">Click "Refresh Zones" to load your Cloudflare domains...</p>
+            </div>
+        </div>
+        </div><!-- END CLOUDFLARE TAB -->
+        
+        <!-- DOMAIN REPUTATION TAB -->
+        <div id="tab-reputation" class="tab-content">
+        <div class="section">
+            <h2>Domain Reputation Checker</h2>
+            <p style="color: #888; margin-bottom: 15px;">Check your domains against spam blacklists: Spamhaus, SpamCop, SURBL, URIBL, Barracuda, and more.</p>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                <input type="text" id="rep-domain-input" placeholder="Enter domain (e.g., example.com)" style="flex: 1; min-width: 250px; padding: 10px; font-size: 14px;">
+                <button onclick="addReputationDomain()" style="white-space: nowrap;">Add Domain</button>
+                <button onclick="refreshAllReputation()" style="background: #28a745; white-space: nowrap;">Refresh All</button>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="color: #888; font-size: 12px;">Quick Add from Your Cloudflare Zones:</label>
+                <button onclick="importCloudflareDomainsToReputation()" style="margin-left: 10px; background: #f6821f; font-size: 12px; padding: 5px 10px;">Import CF Domains</button>
+            </div>
+            
+            <div id="rep-results-container">
+                <table class="data-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left;">Domain</th>
+                            <th style="text-align: center;">Status</th>
+                            <th style="text-align: center;">Listed</th>
+                            <th style="text-align: left;">Details</th>
+                            <th style="text-align: center;">Quick Links</th>
+                            <th style="text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rep-domains-tbody">
+                        <tr><td colspan="6" style="color: #666; text-align: center; padding: 20px;">Add domains above to check their reputation...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top: 20px; padding: 15px; background: #0a0a1a; border-radius: 8px;">
+                <h4 style="color: #00d4ff; margin: 0 0 10px 0;">Blacklists Checked (14 total)</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; font-size: 12px;">
+                    <div><strong>Spamhaus DBL</strong> - Domain Block List</div>
+                    <div><strong>Spamhaus ZEN</strong> - Combined blocklist</div>
+                    <div><strong>SpamCop</strong> - User-reported spam</div>
+                    <div><strong>SURBL Multi</strong> - Spam URI Realtime BL</div>
+                    <div><strong>URIBL Black</strong> - High-confidence spam</div>
+                    <div><strong>URIBL Grey</strong> - Suspicious domains</div>
+                    <div><strong>URIBL Red</strong> - Highest confidence spam</div>
+                    <div><strong>Barracuda</strong> - Enterprise blocklist</div>
+                    <div><strong>SpamRats DYNA</strong> - Dynamic IP ranges</div>
+                    <div><strong>SpamRats NOPTR</strong> - No reverse DNS</div>
+                    <div><strong>SORBS</strong> - Spam & Open Relay BL</div>
+                    <div><strong>Invaluement</strong> - Spammer domains</div>
+                    <div><strong>PSBL</strong> - Passive Spam Block List</div>
+                    <div><strong>CBL</strong> - Composite Blocking List</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 15px; padding: 15px; background: #0a0a1a; border-radius: 8px;">
+                <h4 style="color: #f6821f; margin: 0 0 10px 0;">Quick Links (Manual Lookup)</h4>
+                <div style="font-size: 12px; color: #aaa;">
+                    <div style="margin-bottom: 5px;"><strong style="color: #f6821f;">Talos</strong> - Cisco Talos Intelligence (email/web reputation)</div>
+                    <div style="margin-bottom: 5px;"><strong style="color: #00d4ff;">MX</strong> - MXToolbox SuperTool (100+ blacklists)</div>
+                    <div style="margin-bottom: 5px;"><strong style="color: #28a745;">VT</strong> - VirusTotal (malware/security analysis)</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 15px; padding: 15px; background: #1a1a2e; border-radius: 8px; border-left: 3px solid #ffc107;">
+                <h4 style="color: #ffc107; margin: 0 0 10px 0;">How to Delist</h4>
+                <div style="font-size: 12px; color: #aaa;">
+                    <div style="margin-bottom: 5px;"><strong>Spamhaus:</strong> <a href="https://check.spamhaus.org/" target="_blank" style="color: #00d4ff;">check.spamhaus.org</a></div>
+                    <div style="margin-bottom: 5px;"><strong>SpamCop:</strong> <a href="https://www.spamcop.net/bl.shtml" target="_blank" style="color: #00d4ff;">spamcop.net/bl.shtml</a></div>
+                    <div style="margin-bottom: 5px;"><strong>URIBL:</strong> <a href="https://admin.uribl.com/" target="_blank" style="color: #00d4ff;">admin.uribl.com</a></div>
+                    <div style="margin-bottom: 5px;"><strong>Barracuda:</strong> <a href="https://www.barracudacentral.org/lookups" target="_blank" style="color: #00d4ff;">barracudacentral.org/lookups</a></div>
+                </div>
+            </div>
+        </div>
+        </div><!-- END REPUTATION TAB -->
+        
         <!-- Dead Domains Modal -->
         <div id="dead-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
             <div style="background: #16213e; margin: 50px auto; padding: 20px; border-radius: 10px; max-width: 800px; max-height: 80vh; overflow-y: auto;">
@@ -1060,6 +1233,9 @@ DASHBOARD_HTML = """
     </div>
     
     <script>
+        // Global variables for domain reputation
+        var repDomains = {};
+        
         function formatNum(n) { 
             if (n === null || n === undefined) return '0';
             return n.toLocaleString(); 
@@ -1247,6 +1423,286 @@ DASHBOARD_HTML = """
                         });
                     }
                 });
+        }
+        
+        // =====================================================
+        // LIST BUILDER
+        // =====================================================
+        var listBuilderSegments = [];
+        var presetCounts = {};  // Cache for preset counts
+        
+        var presetDefinitions = {
+            // All Categories
+            'all_clickers': {name: 'ALL Clickers', filters: {clickers: 'true'}},
+            'all_openers': {name: 'ALL Openers', filters: {openers: 'true'}},
+            // By Category
+            'gi_clickers': {name: 'GI Clickers', filters: {category: 'General_Internet', clickers: 'true'}},
+            'gi_openers': {name: 'GI Openers', filters: {category: 'General_Internet', openers: 'true'}},
+            'cable_clickers': {name: 'Cable Provider Clickers', filters: {category: 'Cable_Provider', clickers: 'true'}},
+            'cable_openers': {name: 'Cable Provider Openers', filters: {category: 'Cable_Provider', openers: 'true'}},
+            'big4_clickers': {name: 'Big4 ISP Clickers', filters: {category: 'Big4_ISP', clickers: 'true'}},
+            'big4_openers': {name: 'Big4 ISP Openers', filters: {category: 'Big4_ISP', openers: 'true'}},
+            // Big4 ISP Providers
+            'google_clickers': {name: 'Google/Gmail Clickers', filters: {provider: 'Google', clickers: 'true'}},
+            'google_openers': {name: 'Google/Gmail Openers', filters: {provider: 'Google', openers: 'true'}},
+            'yahoo_clickers': {name: 'Yahoo Clickers', filters: {provider: 'Yahoo', clickers: 'true'}},
+            'yahoo_openers': {name: 'Yahoo Openers', filters: {provider: 'Yahoo', openers: 'true'}},
+            'microsoft_clickers': {name: 'Microsoft/Outlook Clickers', filters: {provider: 'Microsoft', clickers: 'true'}},
+            'microsoft_openers': {name: 'Microsoft/Outlook Openers', filters: {provider: 'Microsoft', openers: 'true'}},
+            'aol_clickers': {name: 'AOL Clickers', filters: {provider: 'AOL', clickers: 'true'}},
+            'aol_openers': {name: 'AOL Openers', filters: {provider: 'AOL', openers: 'true'}},
+            // 2nd Level Big4 (GI emails hosted on Big4 MX servers)
+            '2nd_google_clickers': {name: 'GI on Google MX - Clickers', filters: {category: 'General_Internet', mx_category: 'Google', clickers: 'true'}},
+            '2nd_google_openers': {name: 'GI on Google MX - Openers', filters: {category: 'General_Internet', mx_category: 'Google', openers: 'true'}},
+            '2nd_microsoft_clickers': {name: 'GI on Microsoft MX - Clickers', filters: {category: 'General_Internet', mx_category: 'Microsoft', clickers: 'true'}},
+            '2nd_microsoft_openers': {name: 'GI on Microsoft MX - Openers', filters: {category: 'General_Internet', mx_category: 'Microsoft', openers: 'true'}},
+            '2nd_yahoo_clickers': {name: 'GI on Yahoo MX - Clickers', filters: {category: 'General_Internet', mx_category: 'Yahoo', clickers: 'true'}},
+            '2nd_yahoo_openers': {name: 'GI on Yahoo MX - Openers', filters: {category: 'General_Internet', mx_category: 'Yahoo', openers: 'true'}},
+            '2nd_big4_all_clickers': {name: 'All 2nd Level Big4 Clickers', filters: {category: 'General_Internet', mx_category_big4: 'true', clickers: 'true'}},
+            '2nd_big4_all_openers': {name: 'All 2nd Level Big4 Openers', filters: {category: 'General_Internet', mx_category_big4: 'true', openers: 'true'}},
+            // Cable/Other Providers
+            'apple_clickers': {name: 'Apple/iCloud Clickers', filters: {provider: 'Apple', clickers: 'true'}},
+            'apple_openers': {name: 'Apple/iCloud Openers', filters: {provider: 'Apple', openers: 'true'}},
+            'spectrum_clickers': {name: 'Spectrum Clickers', filters: {provider: 'Spectrum', clickers: 'true'}},
+            'spectrum_openers': {name: 'Spectrum Openers', filters: {provider: 'Spectrum', openers: 'true'}},
+            'comcast_clickers': {name: 'Comcast/Xfinity Clickers', filters: {provider: 'Comcast', clickers: 'true'}},
+            'comcast_openers': {name: 'Comcast/Xfinity Openers', filters: {provider: 'Comcast', openers: 'true'}},
+            'att_clickers': {name: 'AT&T Clickers', filters: {provider: 'AT&T', clickers: 'true'}},
+            'att_openers': {name: 'AT&T Openers', filters: {provider: 'AT&T', openers: 'true'}},
+            'godaddy_clickers': {name: 'GoDaddy Clickers', filters: {provider: 'GoDaddy', clickers: 'true'}},
+            'earthlink_clickers': {name: 'EarthLink Clickers', filters: {provider: 'EarthLink', clickers: 'true'}},
+            // Quality
+            'high_quality': {name: 'High Quality (70+)', filters: {quality: 'high'}},
+            'med_quality': {name: 'Medium Quality (40-69)', filters: {quality: 'medium'}},
+            'verified_all': {name: 'All Verified', filters: {validation_status: 'verified'}}
+        };
+        
+        function loadPresetCounts() {
+            // Load counts for all presets to show in dropdown
+            var presetKeys = Object.keys(presetDefinitions);
+            var segments = presetKeys.map(function(key) {
+                return {key: key, filters: presetDefinitions[key].filters};
+            });
+            
+            fetch('/api/list-builder/preset-counts', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({presets: segments})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.counts) {
+                    presetCounts = data.counts;
+                    updatePresetDropdown();
+                }
+            })
+            .catch(function(e) { console.log('Failed to load preset counts:', e); });
+        }
+        
+        function updatePresetDropdown() {
+            var select = document.getElementById('list-builder-preset');
+            var options = select.querySelectorAll('option[value]');
+            options.forEach(function(opt) {
+                var key = opt.value;
+                if (key && presetCounts[key] !== undefined) {
+                    var preset = presetDefinitions[key];
+                    if (preset) {
+                        var count = presetCounts[key];
+                        var countStr = count >= 1000 ? (count/1000).toFixed(1) + 'k' : count;
+                        opt.textContent = preset.name + ' (' + countStr + ')';
+                    }
+                }
+            });
+        }
+        
+        function addToListBuilder() {
+            var select = document.getElementById('list-builder-preset');
+            var presetKey = select.value;
+            var preset = presetDefinitions[presetKey];
+            
+            if (!preset) {
+                alert('Please select a preset');
+                return;
+            }
+            
+            // Check if already added
+            if (listBuilderSegments.some(function(s) { return s.key === presetKey; })) {
+                alert(preset.name + ' is already in the list');
+                return;
+            }
+            
+            listBuilderSegments.push({
+                key: presetKey,
+                name: preset.name,
+                filters: preset.filters,
+                count: presetCounts[presetKey] || 0
+            });
+            
+            renderListBuilderSegments();
+            updateRunningTotal();
+        }
+        
+        function addCurrentFilters() {
+            var filters = {};
+            var name = [];
+            
+            var provider = document.getElementById('provider').value;
+            var category = document.getElementById('category').value;
+            var clickers = document.getElementById('clickers').value;
+            var openers = document.getElementById('openers').value;
+            var quality = document.getElementById('quality').value;
+            var domain = document.getElementById('domain').value;
+            var state = document.getElementById('state').value;
+            
+            if (provider) { filters.provider = provider; name.push(provider); }
+            if (category) { filters.category = category; name.push(category.replace('_', ' ')); }
+            if (clickers === 'true') { filters.clickers = 'true'; name.push('Clickers'); }
+            if (openers === 'true') { filters.openers = 'true'; name.push('Openers'); }
+            if (quality) { filters.quality = quality; name.push(quality + ' quality'); }
+            if (domain) { filters.domain = domain; name.push(domain); }
+            if (state) { filters.state = state; name.push(state); }
+            
+            if (Object.keys(filters).length === 0) {
+                alert('Please set some filters first');
+                return;
+            }
+            
+            var segmentName = name.join(' + ') || 'Custom Filter';
+            var segmentKey = 'custom_' + Date.now();
+            
+            listBuilderSegments.push({
+                key: segmentKey,
+                name: segmentName,
+                filters: filters,
+                count: 0  // Will be calculated in running total
+            });
+            
+            renderListBuilderSegments();
+            updateRunningTotal();
+        }
+        
+        function removeFromListBuilder(index) {
+            listBuilderSegments.splice(index, 1);
+            renderListBuilderSegments();
+            updateRunningTotal();
+        }
+        
+        function renderListBuilderSegments() {
+            var container = document.getElementById('list-builder-segments');
+            
+            if (listBuilderSegments.length === 0) {
+                container.innerHTML = '<span style="color: #666; font-size: 12px;">No segments added yet. Select presets above or use "Add Current Filters".</span>';
+                document.getElementById('list-builder-count').textContent = '';
+                return;
+            }
+            
+            var html = '';
+            listBuilderSegments.forEach(function(segment, index) {
+                var countStr = '';
+                if (segment.count) {
+                    countStr = segment.count >= 1000 ? ' (' + (segment.count/1000).toFixed(1) + 'k)' : ' (' + segment.count + ')';
+                }
+                html += '<span style="display: inline-block; background: #17a2b8; color: #fff; padding: 5px 10px; border-radius: 15px; margin: 3px; font-size: 12px;">';
+                html += segment.name + countStr;
+                html += ' <span onclick="removeFromListBuilder(' + index + ')" style="cursor: pointer; margin-left: 5px; color: #ff6b6b;">&times;</span>';
+                html += '</span>';
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function updateRunningTotal() {
+            if (listBuilderSegments.length === 0) {
+                document.getElementById('list-builder-count').textContent = '';
+                return;
+            }
+            
+            document.getElementById('list-builder-count').textContent = 'Calculating...';
+            
+            fetch('/api/list-builder/count', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({segments: listBuilderSegments})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    document.getElementById('list-builder-count').textContent = 'Error';
+                } else {
+                    var totalStr = data.total >= 1000 ? (data.total/1000).toFixed(1) + 'k' : data.total;
+                    document.getElementById('list-builder-count').innerHTML = '<strong style="color: #00d4ff; font-size: 14px;">Running Total: ' + data.total.toLocaleString() + ' unique emails</strong>';
+                }
+            })
+            .catch(function(e) {
+                document.getElementById('list-builder-count').textContent = 'Error';
+            });
+        }
+        
+        function clearListBuilder() {
+            listBuilderSegments = [];
+            renderListBuilderSegments();
+            document.getElementById('list-builder-count').textContent = '';
+        }
+        
+        function previewListBuilder() {
+            if (listBuilderSegments.length === 0) {
+                alert('Add some segments first');
+                return;
+            }
+            
+            document.getElementById('list-builder-count').textContent = 'Counting...';
+            
+            fetch('/api/list-builder/count', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({segments: listBuilderSegments})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    document.getElementById('list-builder-count').textContent = 'Error: ' + data.error;
+                } else {
+                    document.getElementById('list-builder-count').textContent = 'Total: ' + data.total.toLocaleString() + ' unique emails';
+                }
+            })
+            .catch(function(e) {
+                document.getElementById('list-builder-count').textContent = 'Error: ' + e;
+            });
+        }
+        
+        function exportListBuilder() {
+            if (listBuilderSegments.length === 0) {
+                alert('Add some segments first');
+                return;
+            }
+            
+            var emailOnly = document.getElementById('export-email-only').checked;
+            document.getElementById('list-builder-count').textContent = 'Preparing export...';
+            
+            fetch('/api/list-builder/export', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({segments: listBuilderSegments, email_only: emailOnly})
+            })
+            .then(function(response) {
+                if (!response.ok) throw new Error('Export failed');
+                return response.blob();
+            })
+            .then(function(blob) {
+                var url = window.URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                var suffix = emailOnly ? '_emails_only' : '';
+                a.download = 'combined_list' + suffix + '_' + new Date().toISOString().slice(0,10) + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                document.getElementById('list-builder-count').textContent = 'Export complete!';
+            })
+            .catch(function(e) {
+                document.getElementById('list-builder-count').textContent = 'Export error: ' + e;
+            });
         }
         
         function runQuery(page) {
@@ -1665,13 +2121,27 @@ DASHBOARD_HTML = """
                 if (tabName === 'query' && allBtns[1]) allBtns[1].className = 'tab-btn active';
                 if (tabName === 'mx' && allBtns[2]) allBtns[2].className = 'tab-btn active';
                 if (tabName === 'config' && allBtns[3]) allBtns[3].className = 'tab-btn active';
-                // Load stats only when stats tab is shown
-                if (tabName === 'stats') {
-                    try { loadDetailedStats(); } catch(e) { console.log('Stats error:', e); }
-                }
+                // Stats tab: do NOT auto-refresh - user must click "Load Cached Stats" or "Recalculate"
+                // if (tabName === 'stats') { loadDetailedStats(); }
                 // Load domain config when config tab is shown
                 if (tabName === 'config') {
                     try { loadDomainConfig(); } catch(e) { console.log('Config error:', e); }
+                }
+                // Load reputation data when reputation tab is shown
+                if (tabName === 'reputation') {
+                    try { 
+                        if (typeof repDomains !== 'undefined' && Object.keys(repDomains).length === 0) {
+                            loadReputationDomains(); 
+                        }
+                    } catch(e) { console.log('Reputation error:', e); }
+                }
+                // Load preset counts when query tab is shown
+                if (tabName === 'query') {
+                    try {
+                        if (typeof loadPresetCounts === 'function' && Object.keys(presetCounts).length === 0) {
+                            loadPresetCounts();
+                        }
+                    } catch(e) { console.log('Query preset counts error:', e); }
                 }
             } catch(e) {
                 alert('Tab error: ' + e.message);
@@ -1758,6 +2228,552 @@ DASHBOARD_HTML = """
                 loadDomainConfig();
             })
             .catch(function(e) {
+                alert('Failed: ' + e);
+            });
+        }
+        
+        // =====================================================
+        // CLOUDFLARE MANAGER
+        // =====================================================
+        function loadCloudflareZones() {
+            var container = document.getElementById('cf-zones-container');
+            container.innerHTML = '<p style="color: #17a2b8;">Loading zones...</p>';
+            
+            fetch('/api/cloudflare/zones')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    container.innerHTML = '<p style="color: #ff6b6b;">Error: ' + data.error + '</p>';
+                    return;
+                }
+                
+                if (!data.zones || data.zones.length === 0) {
+                    container.innerHTML = '<p style="color: #ffc107;">No zones found. Check your API token permissions.</p>';
+                    return;
+                }
+                
+                var html = '';
+                data.zones.forEach(function(zone) {
+                    html += '<div class="cf-zone-card" id="cf-zone-' + zone.id + '" style="background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 15px; margin-bottom: 15px;">';
+                    html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">';
+                    html += '<h3 style="color: #00d4ff; margin: 0;">' + zone.name + '</h3>';
+                    html += '<div style="display: flex; align-items: center; gap: 10px;">';
+                    html += '<span style="color: ' + (zone.status === 'active' ? '#28a745' : '#ffc107') + '; font-size: 12px;">' + zone.status.toUpperCase() + '</span>';
+                    html += '<button class="cf-remove-btn" data-zone="' + zone.id + '" data-domain="' + zone.name + '" style="padding: 3px 8px; font-size: 10px; background: #dc3545;">Remove</button>';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">';
+                    
+                    // Bot Fight toggle
+                    html += '<div class="cf-toggle-row" style="background: #0d1b2a; padding: 12px; border-radius: 6px;">';
+                    html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+                    html += '<div><strong style="color: #fff;">Bot Fight</strong><br><span style="color: #888; font-size: 11px;">Browser check + High security</span></div>';
+                    html += '<label class="switch"><input type="checkbox" id="cf-' + zone.id + '-botfight" data-zone="' + zone.id + '" data-feature="bot_fight"><span class="slider"></span></label>';
+                    html += '</div></div>';
+                    
+                    // US Only toggle
+                    html += '<div class="cf-toggle-row" style="background: #0d1b2a; padding: 12px; border-radius: 6px;">';
+                    html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+                    html += '<div><strong style="color: #fff;">US Only</strong><br><span style="color: #888; font-size: 11px;">Block non-US traffic</span></div>';
+                    html += '<label class="switch"><input type="checkbox" id="cf-' + zone.id + '-usonly" data-zone="' + zone.id + '" data-feature="us_only"><span class="slider"></span></label>';
+                    html += '</div></div>';
+                    
+                    // Block Scanners toggle
+                    html += '<div class="cf-toggle-row" style="background: #0d1b2a; padding: 12px; border-radius: 6px;">';
+                    html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+                    html += '<div><strong style="color: #fff;">Block Scanners</strong><br><span style="color: #888; font-size: 11px;">Gmail, Outlook, SES scanners</span></div>';
+                    html += '<label class="switch"><input type="checkbox" id="cf-' + zone.id + '-scanners" data-zone="' + zone.id + '" data-feature="block_scanners"><span class="slider"></span></label>';
+                    html += '</div></div>';
+                    
+                    // Block Dupes toggle with time dropdown
+                    html += '<div class="cf-toggle-row" style="background: #0d1b2a; padding: 12px; border-radius: 6px;">';
+                    html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+                    html += '<div><strong style="color: #fff;">Block Dupes</strong><br>';
+                    html += '<span style="color: #888; font-size: 10px;">IP + Cookie rate limit</span><br>';
+                    html += '<select id="cf-' + zone.id + '-dupes-time" style="margin-top: 5px; padding: 4px; background: #1a1a2e; border: 1px solid #444; color: #fff; border-radius: 3px; font-size: 11px;">';
+                    html += '<option value="10" selected>10 sec (Free)</option>';
+                    html += '<option value="60">1 min (Pro+)</option>';
+                    html += '<option value="120">2 min (Pro+)</option>';
+                    html += '<option value="300">5 min (Pro+)</option>';
+                    html += '<option value="600">10 min (Pro+)</option>';
+                    html += '<option value="3600">1 hour (Pro+)</option>';
+                    html += '</select></div>';
+                    html += '<label class="switch"><input type="checkbox" id="cf-' + zone.id + '-dupes" data-zone="' + zone.id + '" data-feature="block_dupes"><span class="slider"></span></label>';
+                    html += '</div></div>';
+                    
+                    // Redirect URL for blocked traffic
+                    html += '<div class="cf-toggle-row" style="background: #0d1b2a; padding: 12px; border-radius: 6px; grid-column: span 2;">';
+                    html += '<div><strong style="color: #fff;">Blocked Traffic Redirect</strong><br>';
+                    html += '<span style="color: #888; font-size: 10px;">Redirect blocked visitors to this URL instead of showing error</span><br>';
+                    html += '<div style="display: flex; gap: 10px; margin-top: 8px;">';
+                    html += '<input type="text" id="cf-' + zone.id + '-redirect-url" placeholder="https://example.com/blocked" style="flex: 1; padding: 6px; background: #1a1a2e; border: 1px solid #444; color: #fff; border-radius: 3px; font-size: 12px;">';
+                    html += '<button class="cf-redirect-btn" data-zone="' + zone.id + '" style="padding: 6px 12px; font-size: 11px;">Set Redirect</button>';
+                    html += '</div></div></div>';
+                    
+                    html += '</div>';
+                    html += '<p id="cf-' + zone.id + '-status" style="color: #666; font-size: 11px; margin: 10px 0 0 0;">Loading status...</p>';
+                    html += '</div>';
+                    
+                    // Load status for this zone
+                    setTimeout(function() { loadZoneStatus(zone.id); }, 100);
+                });
+                
+                container.innerHTML = html;
+                
+                // Add event listeners to all toggle checkboxes
+                var toggles = container.querySelectorAll('input[type="checkbox"][data-zone]');
+                toggles.forEach(function(toggle) {
+                    toggle.addEventListener('change', function() {
+                        var zoneId = this.getAttribute('data-zone');
+                        var feature = this.getAttribute('data-feature');
+                        toggleCfFeature(zoneId, feature, this.checked);
+                    });
+                });
+                
+                // Add event listeners to redirect buttons
+                var redirectBtns = container.querySelectorAll('.cf-redirect-btn');
+                redirectBtns.forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var zoneId = this.getAttribute('data-zone');
+                        setCfRedirect(zoneId);
+                    });
+                });
+                
+                // Add event listeners to remove buttons
+                var removeBtns = container.querySelectorAll('.cf-remove-btn');
+                removeBtns.forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var domain = this.getAttribute('data-domain');
+                        removeCfZone(domain);
+                    });
+                });
+            })
+            .catch(function(e) {
+                container.innerHTML = '<p style="color: #ff6b6b;">Failed: ' + e + '</p>';
+            });
+        }
+        
+        function loadZoneStatus(zoneId) {
+            fetch('/api/cloudflare/zones/' + zoneId + '/status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) return;
+                
+                // Set toggle states
+                var botfight = document.getElementById('cf-' + zoneId + '-botfight');
+                var usonly = document.getElementById('cf-' + zoneId + '-usonly');
+                var scanners = document.getElementById('cf-' + zoneId + '-scanners');
+                var dupes = document.getElementById('cf-' + zoneId + '-dupes');
+                var status = document.getElementById('cf-' + zoneId + '-status');
+                
+                if (botfight) botfight.checked = data.bot_fight || data.browser_check;
+                if (usonly) usonly.checked = data.us_only;
+                if (scanners) scanners.checked = data.block_scanners;
+                if (dupes) dupes.checked = data.block_dupes;
+                if (status) status.textContent = 'Security Level: ' + (data.security_level || 'medium').toUpperCase();
+            })
+            .catch(function() {});
+        }
+        
+        function toggleCfFeature(zoneId, feature, enabled) {
+            var statusEl = document.getElementById('cf-' + zoneId + '-status');
+            if (statusEl) statusEl.textContent = 'Updating ' + feature + '...';
+            
+            var payload = {feature: feature, enabled: enabled};
+            
+            // Add time value and redirect URL for block_dupes
+            if (feature === 'block_dupes') {
+                var timeSelect = document.getElementById('cf-' + zoneId + '-dupes-time');
+                if (timeSelect) {
+                    payload.duration = parseInt(timeSelect.value);
+                }
+                // Include redirect URL if set
+                var redirectInput = document.getElementById('cf-' + zoneId + '-redirect-url');
+                if (redirectInput && redirectInput.value.trim()) {
+                    payload.redirect_url = redirectInput.value.trim();
+                }
+            }
+            
+            fetch('/api/cloudflare/zones/' + zoneId + '/toggle', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    if (statusEl) statusEl.textContent = 'Error: ' + data.error;
+                    // Revert checkbox
+                    var cb = document.getElementById('cf-' + zoneId + '-' + feature.replace('_', ''));
+                    if (cb) cb.checked = !enabled;
+                    return;
+                }
+                if (statusEl) statusEl.textContent = feature + ' ' + (enabled ? 'enabled' : 'disabled') + ' - ' + new Date().toLocaleTimeString();
+            })
+            .catch(function(e) {
+                if (statusEl) statusEl.textContent = 'Failed: ' + e;
+            });
+        }
+        
+        function setCfRedirect(zoneId) {
+            var urlInput = document.getElementById('cf-' + zoneId + '-redirect-url');
+            var statusEl = document.getElementById('cf-' + zoneId + '-status');
+            var redirectUrl = urlInput ? urlInput.value.trim() : '';
+            
+            if (!redirectUrl) {
+                alert('Please enter a redirect URL');
+                return;
+            }
+            
+            if (statusEl) statusEl.textContent = 'Setting redirect...';
+            
+            fetch('/api/cloudflare/zones/' + zoneId + '/redirect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({redirect_url: redirectUrl})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    if (statusEl) statusEl.textContent = 'Error: ' + data.error;
+                    return;
+                }
+                if (statusEl) statusEl.textContent = 'Redirect set to ' + redirectUrl + ' - ' + new Date().toLocaleTimeString();
+            })
+            .catch(function(e) {
+                if (statusEl) statusEl.textContent = 'Failed: ' + e;
+            });
+        }
+        
+        function removeCfZone(domain) {
+            if (!confirm('Remove ' + domain + ' from managed CF zones?\\n\\nThis will NOT delete any rules from Cloudflare, just remove it from this dashboard.')) {
+                return;
+            }
+            
+            fetch('/api/cloudflare/zones/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({domain: domain})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                // Refresh the zones list
+                loadCloudflareZones();
+            })
+            .catch(function(e) {
+                alert('Failed: ' + e);
+            });
+        }
+        
+        // =====================================================
+        // DOMAIN REPUTATION CHECKER
+        // =====================================================
+        
+        function loadReputationDomains() {
+            fetch('/api/reputation/domains')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                repDomains = data.domains || {};
+                renderReputationTable();
+            })
+            .catch(function(e) {
+                console.error('Failed to load reputation domains:', e);
+            });
+        }
+        
+        function renderReputationTable() {
+            var tbody = document.getElementById('rep-domains-tbody');
+            if (!tbody) return;
+            
+            var domains = Object.keys(repDomains);
+            if (domains.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="color: #666; text-align: center; padding: 20px;">Add domains above to check their reputation...</td></tr>';
+                return;
+            }
+            
+            var html = '';
+            domains.sort().forEach(function(domain) {
+                var result = repDomains[domain];
+                var isClean = result.clean;
+                var listedCount = result.listed_count || 0;
+                
+                var statusColor = isClean ? '#28a745' : (listedCount > 2 ? '#dc3545' : '#ffc107');
+                var statusText = isClean ? 'CLEAN' : (listedCount + ' LISTED');
+                
+                // Build details
+                var details = [];
+                (result.blacklists || []).forEach(function(bl) {
+                    if (bl.listed) {
+                        var reason = bl.reason ? ' (' + bl.reason + ')' : '';
+                        details.push('<span style="color: #dc3545;">' + bl.name + reason + '</span>');
+                    }
+                });
+                var detailsHtml = details.length > 0 ? details.join(', ') : '<span style="color: #28a745;">All clear</span>';
+                
+                // Build quick links
+                var urls = result.lookup_urls || {};
+                var linksHtml = '';
+                if (urls['Talos Intelligence']) {
+                    linksHtml += '<a href="' + urls['Talos Intelligence'] + '" target="_blank" style="color: #f6821f; font-size: 11px; margin-right: 6px;" title="Cisco Talos">Talos</a>';
+                }
+                if (urls['MXToolbox']) {
+                    linksHtml += '<a href="' + urls['MXToolbox'] + '" target="_blank" style="color: #00d4ff; font-size: 11px; margin-right: 6px;" title="MXToolbox">MX</a>';
+                }
+                if (urls['VirusTotal']) {
+                    linksHtml += '<a href="' + urls['VirusTotal'] + '" target="_blank" style="color: #28a745; font-size: 11px;" title="VirusTotal">VT</a>';
+                }
+                if (!linksHtml) {
+                    // Fallback if no URLs in result
+                    linksHtml = '<a href="https://talosintelligence.com/reputation_center/lookup?search=' + domain + '" target="_blank" style="color: #f6821f; font-size: 11px; margin-right: 6px;">Talos</a>';
+                    linksHtml += '<a href="https://mxtoolbox.com/SuperTool.aspx?action=blacklist%3a' + domain + '" target="_blank" style="color: #00d4ff; font-size: 11px; margin-right: 6px;">MX</a>';
+                    linksHtml += '<a href="https://www.virustotal.com/gui/domain/' + domain + '" target="_blank" style="color: #28a745; font-size: 11px;">VT</a>';
+                }
+                
+                html += '<tr>';
+                html += '<td style="font-weight: bold;">' + domain + '</td>';
+                html += '<td style="text-align: center;"><span style="color: ' + statusColor + '; font-weight: bold;">' + statusText + '</span></td>';
+                html += '<td style="text-align: center;">' + listedCount + ' / ' + (result.blacklists || []).length + '</td>';
+                html += '<td style="font-size: 12px;">' + detailsHtml + '</td>';
+                html += '<td style="text-align: center;">' + linksHtml + '</td>';
+                html += '<td style="text-align: center; white-space: nowrap;">';
+                html += '<button class="rep-cf-btn" data-domain="' + domain + '" style="padding: 3px 8px; font-size: 11px; margin-right: 5px; background: #f6821f;" title="Enable CF Protection">CF</button>';
+                html += '<button class="rep-recheck-btn" data-domain="' + domain + '" style="padding: 3px 8px; font-size: 11px; margin-right: 5px;">Check</button>';
+                html += '<button class="rep-remove-btn" data-domain="' + domain + '" style="padding: 3px 8px; font-size: 11px; background: #dc3545;">X</button>';
+                html += '</td>';
+                html += '</tr>';
+            });
+            
+            tbody.innerHTML = html;
+            
+            // Attach event listeners to buttons
+            var recheckBtns = tbody.querySelectorAll('.rep-recheck-btn');
+            recheckBtns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    checkSingleDomain(this.getAttribute('data-domain'));
+                });
+            });
+            
+            var removeBtns = tbody.querySelectorAll('.rep-remove-btn');
+            removeBtns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    removeDomain(this.getAttribute('data-domain'));
+                });
+            });
+            
+            var cfBtns = tbody.querySelectorAll('.rep-cf-btn');
+            cfBtns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    enableCfProtection(this.getAttribute('data-domain'), this);
+                });
+            });
+        }
+        
+        function addReputationDomain() {
+            var input = document.getElementById('rep-domain-input');
+            var domain = input.value.trim().toLowerCase();
+            if (!domain) {
+                alert('Please enter a domain');
+                return;
+            }
+            
+            // Remove protocol if present
+            if (domain.indexOf('://') > -1) {
+                domain = domain.split('://')[1];
+            }
+            domain = domain.split('/')[0];
+            
+            input.value = '';
+            input.disabled = true;
+            
+            fetch('/api/reputation/check', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({domain: domain})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                input.disabled = false;
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                repDomains[domain] = data;
+                renderReputationTable();
+            })
+            .catch(function(e) {
+                input.disabled = false;
+                alert('Failed: ' + e);
+            });
+        }
+        
+        function checkSingleDomain(domain) {
+            var row = document.querySelector('tr td:first-child');
+            
+            fetch('/api/reputation/check', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({domain: domain})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                repDomains[domain] = data;
+                renderReputationTable();
+            })
+            .catch(function(e) {
+                alert('Failed: ' + e);
+            });
+        }
+        
+        function removeDomain(domain) {
+            if (!confirm('Remove ' + domain + ' from monitoring?')) return;
+            
+            fetch('/api/reputation/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({domain: domain})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                delete repDomains[domain];
+                renderReputationTable();
+            })
+            .catch(function(e) {
+                alert('Failed: ' + e);
+            });
+        }
+        
+        function enableCfProtection(domain, btn) {
+            var options = [
+                'US Only (block non-US traffic)',
+                'Block Scanners (bots, link checkers)',
+                'Block Dupes (rate limit clicks)',
+                'All Protection (recommended)'
+            ];
+            
+            var choice = prompt(
+                'Enable Cloudflare protection for ' + domain + ':\\n\\n' +
+                '1 = US Only\\n' +
+                '2 = Block Scanners\\n' +
+                '3 = Block Dupes (10 sec rate limit)\\n' +
+                '4 = ALL (recommended)\\n\\n' +
+                'Enter choice (1-4):',
+                '4'
+            );
+            
+            if (!choice) return;
+            
+            var features = [];
+            if (choice === '1' || choice === '4') features.push('us_only');
+            if (choice === '2' || choice === '4') features.push('block_scanners');
+            if (choice === '3' || choice === '4') features.push('block_dupes');
+            
+            if (features.length === 0) {
+                alert('Invalid choice');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = '...';
+            
+            fetch('/api/reputation/cf-protect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({domain: domain, features: features})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btn.disabled = false;
+                btn.textContent = 'CF';
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else if (data.not_found) {
+                    alert(domain + ' is not in your Cloudflare zones.\\nAdd it to Cloudflare first.');
+                } else {
+                    var msg = 'CF Protection enabled for ' + domain + ':\\n';
+                    if (data.results) {
+                        for (var f in data.results) {
+                            var r = data.results[f];
+                            msg += '\\n' + f + ': ' + (r.success ? 'OK' : 'Failed');
+                        }
+                    }
+                    msg += '\\n\\nSwitching to Cloudflare tab...';
+                    alert(msg);
+                    
+                    // Switch to Cloudflare tab and refresh zones
+                    showTab('cloudflare');
+                    loadCloudflareZones();
+                }
+            })
+            .catch(function(e) {
+                btn.disabled = false;
+                btn.textContent = 'CF';
+                alert('Failed: ' + e);
+            });
+        }
+        
+        function refreshAllReputation() {
+            var btn = document.querySelector('#tab-reputation button[onclick="refreshAllReputation()"]');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Checking...';
+            }
+            
+            fetch('/api/reputation/refresh-all', {method: 'POST'})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Refresh All';
+                }
+                if (data.domains) {
+                    repDomains = data.domains;
+                    renderReputationTable();
+                }
+            })
+            .catch(function(e) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Refresh All';
+                }
+                alert('Failed: ' + e);
+            });
+        }
+        
+        function importCloudflareDomainsToReputation() {
+            var btn = document.querySelector('button[onclick="importCloudflareDomainsToReputation()"]');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Importing...';
+            }
+            
+            fetch('/api/reputation/import-cf', {method: 'POST'})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Import CF Domains';
+                }
+                if (data.domains) {
+                    repDomains = data.domains;
+                    renderReputationTable();
+                    alert('Imported ' + Object.keys(data.domains).length + ' domains');
+                }
+            })
+            .catch(function(e) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Import CF Domains';
+                }
                 alert('Failed: ' + e);
             });
         }
@@ -2784,40 +3800,18 @@ def api_stats_detailed():
                 if p + suffix not in stats:
                     stats[p + suffix] = 0
         
-        # Top 10 GI Domains (query fresh each time - fast with index)
-        # Exclude Apple domains since they have their own category
-        cursor.execute("""
-            SELECT 
-                email_domain,
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE mx_valid = true OR mx_valid IS NULL) as good,
-                COUNT(*) FILTER (WHERE mx_valid = false) as dead,
-                COUNT(*) FILTER (WHERE quality_score >= 70) as high,
-                COUNT(*) FILTER (WHERE quality_score >= 40 AND quality_score < 70) as med,
-                COUNT(*) FILTER (WHERE quality_score < 40 OR quality_score IS NULL) as low,
-                COUNT(*) FILTER (WHERE is_clicker = true) as clickers,
-                COUNT(*) FILTER (WHERE is_opener = true) as openers
-            FROM emails 
-            WHERE email_category = 'General_Internet'
-              AND email_domain NOT IN ('icloud.com', 'me.com', 'mac.com')
-            GROUP BY email_domain
-            ORDER BY total DESC
-            LIMIT 10
-        """)
-        top_gi = []
-        for row in cursor.fetchall():
-            top_gi.append({
-                'domain': row[0],
-                'total': row[1],
-                'good': row[2],
-                'dead': row[3],
-                'high': row[4],
-                'med': row[5],
-                'low': row[6],
-                'click': row[7],
-                'open': row[8]
-            })
-        stats['top_gi_domains'] = top_gi
+        # Top 10 GI Domains - read from JSON file (calculated during Recalculate)
+        import json
+        import os
+        top_gi_file = os.path.join(os.path.dirname(__file__), 'top_gi_domains.json')
+        if os.path.exists(top_gi_file):
+            try:
+                with open(top_gi_file, 'r') as f:
+                    stats['top_gi_domains'] = json.load(f)
+            except:
+                stats['top_gi_domains'] = []
+        else:
+            stats['top_gi_domains'] = []
         
         cursor.close()
         conn.close()
@@ -3159,6 +4153,39 @@ def api_stats_refresh():
         """)
         stats['gi_domains'] = cursor.fetchone()[0]
         
+        # Top 10 GI Domains (calculated during recalculate, stored as JSON)
+        cursor.execute("""
+            SELECT 
+                email_domain,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE mx_valid = true OR mx_valid IS NULL) as good,
+                COUNT(*) FILTER (WHERE mx_valid = false) as dead,
+                COUNT(*) FILTER (WHERE quality_score >= 70) as high,
+                COUNT(*) FILTER (WHERE quality_score >= 40 AND quality_score < 70) as med,
+                COUNT(*) FILTER (WHERE quality_score < 40 OR quality_score IS NULL) as low,
+                COUNT(*) FILTER (WHERE is_clicker = true) as clickers,
+                COUNT(*) FILTER (WHERE is_opener = true) as openers
+            FROM emails 
+            WHERE email_category = 'General_Internet'
+              AND email_domain NOT IN ('icloud.com', 'me.com', 'mac.com')
+            GROUP BY email_domain
+            ORDER BY total DESC
+            LIMIT 10
+        """)
+        top_gi = []
+        for row in cursor.fetchall():
+            top_gi.append({
+                'domain': row[0],
+                'total': row[1],
+                'good': row[2],
+                'dead': row[3],
+                'high': row[4],
+                'med': row[5],
+                'low': row[6],
+                'click': row[7],
+                'open': row[8]
+            })
+        
         # Update cache
         for name, value in stats.items():
             cursor.execute("""
@@ -3166,11 +4193,19 @@ def api_stats_refresh():
                 ON CONFLICT (stat_name) DO UPDATE SET stat_value = EXCLUDED.stat_value, updated_at = NOW()
             """, (name, value))
         
+        # Store top_gi_domains as JSON file
+        import json
+        import os
+        top_gi_json = json.dumps(top_gi)
+        top_gi_file = os.path.join(os.path.dirname(__file__), 'top_gi_domains.json')
+        with open(top_gi_file, 'w') as f:
+            f.write(top_gi_json)
+        
         conn.commit()
         cursor.close()
         conn.close()
         
-        return jsonify({'success': True, 'stats_updated': len(stats)})
+        return jsonify({'success': True, 'stats_updated': len(stats), 'top_gi_calculated': len(top_gi)})
     except Exception as e:
         import traceback
         return jsonify({'error': str(e), 'trace': traceback.format_exc()})
@@ -3301,7 +4336,10 @@ def api_query():
         
         sql = f"""SELECT email, email_domain, email_provider, email_brand, email_category, 
                          quality_score, is_clicker, is_opener, first_name, last_name, 
-                         city, state, zipcode, phone, gender, signup_date, data_source
+                         city, state, zipcode, phone, gender,
+                         CAST(dob AS TEXT) as dob,
+                         CAST(signup_date AS TEXT) as signup_date, 
+                         data_source
                   FROM emails WHERE {where_clause}
                   ORDER BY quality_score DESC NULLS LAST
                   LIMIT {limit} OFFSET {offset}"""
@@ -3471,7 +4509,11 @@ def api_export():
         
         sql = f"""SELECT email, email_domain, email_provider, email_brand, email_category, 
                          quality_score, is_clicker, is_opener, first_name, last_name,
-                         phone, city, state, zipcode, gender, signup_date, data_source
+                         phone, city, state, zipcode, gender, 
+                         CAST(dob AS TEXT) as dob,
+                         CAST(signup_date AS TEXT) as signup_date, 
+                         CAST(created_at AS TEXT) as created_at,
+                         data_source
                   FROM emails WHERE {where_clause}
                   ORDER BY quality_score DESC NULLS LAST
                   LIMIT {limit}"""
@@ -4495,6 +5537,497 @@ def api_filter_zipcodes():
         return jsonify({'zipcodes': zipcodes})
     except Exception as e:
         return jsonify({'zipcodes': [], 'error': str(e)})
+
+
+# =============================================================================
+# CLOUDFLARE API ENDPOINTS
+# =============================================================================
+
+@app.route('/api/cloudflare/zones')
+def api_cloudflare_zones():
+    """Get all Cloudflare zones."""
+    try:
+        import cloudflare as cf
+        zones = cf.list_zones()
+        return jsonify({
+            'zones': [{'id': z['id'], 'name': z['name'], 'status': z['status']} for z in zones],
+            'managed_count': len(zones)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/cloudflare/zones/remove', methods=['POST'])
+def api_cloudflare_remove_zone():
+    """Remove a domain from the managed zones list."""
+    try:
+        import cloudflare as cf
+        data = request.get_json()
+        domain = data.get('domain', '').strip().lower()
+        
+        if not domain:
+            return jsonify({'error': 'No domain provided'})
+        
+        cf.remove_managed_zone(domain)
+        return jsonify({'success': True, 'domain': domain})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/cloudflare/zones/<zone_id>/status')
+def api_cloudflare_zone_status(zone_id):
+    """Get security status for a zone."""
+    try:
+        import cloudflare as cf
+        status = cf.get_zone_security_status(zone_id)
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/cloudflare/zones/<zone_id>/toggle', methods=['POST'])
+def api_cloudflare_toggle(zone_id):
+    """Toggle a security feature for a zone."""
+    try:
+        import cloudflare as cf
+        data = request.get_json()
+        feature = data.get('feature')
+        enabled = data.get('enabled', False)
+        
+        if feature == 'bot_fight':
+            result = cf.toggle_bot_fight(zone_id, enabled)
+        elif feature == 'us_only':
+            # Get current rule ID if exists
+            status = cf.get_zone_security_status(zone_id)
+            result = cf.toggle_us_only(zone_id, enabled, status.get('us_only_rule_id'))
+        elif feature == 'block_scanners':
+            status = cf.get_zone_security_status(zone_id)
+            result = cf.toggle_block_scanners(zone_id, enabled, status.get('block_scanners_rule_id'))
+        elif feature == 'block_dupes':
+            status = cf.get_zone_security_status(zone_id)
+            duration = data.get('duration', 10)  # Default 10 seconds (free plan)
+            redirect_url = data.get('redirect_url')  # Optional redirect URL
+            result = cf.toggle_block_dupes(zone_id, enabled, status.get('block_dupes_rule_id'), duration, redirect_url)
+        else:
+            return jsonify({'error': f'Unknown feature: {feature}'})
+        
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()})
+
+
+@app.route('/api/cloudflare/zones/<zone_id>/redirect', methods=['POST'])
+def api_cloudflare_redirect(zone_id):
+    """Set redirect URL for blocked traffic."""
+    try:
+        import cloudflare as cf
+        data = request.get_json()
+        redirect_url = data.get('redirect_url', '')
+        
+        if not redirect_url:
+            return jsonify({'error': 'No redirect URL provided'})
+        
+        result = cf.set_blocked_redirect(zone_id, redirect_url)
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()})
+
+
+# =====================================================
+# DOMAIN REPUTATION API
+# =====================================================
+
+@app.route('/api/reputation/domains')
+def api_reputation_domains():
+    """Get all monitored domains and their cached results."""
+    try:
+        import domain_reputation as dr
+        cache = dr.get_cached_results()
+        return jsonify(cache)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/reputation/check', methods=['POST'])
+def api_reputation_check():
+    """Check a single domain and add to monitoring."""
+    try:
+        import domain_reputation as dr
+        data = request.get_json()
+        domain = data.get('domain', '').strip().lower()
+        
+        if not domain:
+            return jsonify({'error': 'No domain provided'})
+        
+        # Remove protocol if present
+        domain = domain.replace('https://', '').replace('http://', '').split('/')[0]
+        
+        result = dr.add_custom_domain(domain)
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()})
+
+
+@app.route('/api/reputation/remove', methods=['POST'])
+def api_reputation_remove():
+    """Remove a domain from monitoring."""
+    try:
+        import domain_reputation as dr
+        data = request.get_json()
+        domain = data.get('domain', '').strip().lower()
+        
+        if not domain:
+            return jsonify({'error': 'No domain provided'})
+        
+        dr.remove_custom_domain(domain)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/reputation/refresh-all', methods=['POST'])
+def api_reputation_refresh():
+    """Refresh checks for all monitored domains."""
+    try:
+        import domain_reputation as dr
+        results = dr.refresh_all_domains()
+        cache = dr.get_cached_results()
+        return jsonify(cache)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()})
+
+
+@app.route('/api/reputation/import-cf', methods=['POST'])
+def api_reputation_import_cf():
+    """Import domains from Cloudflare zones."""
+    try:
+        import domain_reputation as dr
+        import cloudflare as cf
+        
+        # Get all CF zones
+        zones = cf.list_zones()
+        
+        # Add each domain
+        for zone in zones:
+            domain = zone.get('name', '')
+            if domain:
+                dr.add_custom_domain(domain)
+        
+        # Return all results
+        results = dr.refresh_all_domains()
+        cache = dr.get_cached_results()
+        return jsonify(cache)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()})
+
+
+@app.route('/api/reputation/cf-protect', methods=['POST'])
+def api_reputation_cf_protect():
+    """Enable Cloudflare protection for a specific domain and add to managed list."""
+    try:
+        import cloudflare as cf
+        data = request.get_json()
+        domain = data.get('domain', '').strip().lower()
+        features = data.get('features', [])
+        
+        if not domain:
+            return jsonify({'error': 'No domain provided'})
+        
+        if not features:
+            return jsonify({'error': 'No features selected'})
+        
+        # Find the zone in ALL zones (not just managed)
+        zones = cf.list_all_zones()
+        zone_id = None
+        for zone in zones:
+            if zone.get('name', '').lower() == domain:
+                zone_id = zone.get('id')
+                break
+        
+        if not zone_id:
+            return jsonify({'not_found': True, 'error': f'Domain {domain} not found in Cloudflare zones'})
+        
+        # Add to managed zones list (so it shows in CF tab)
+        cf.add_managed_zone(domain)
+        
+        # Get current status
+        status = cf.get_zone_security_status(zone_id)
+        
+        results = {}
+        
+        # Enable requested features
+        if 'us_only' in features:
+            result = cf.toggle_us_only(zone_id, True, status.get('us_only_rule_id'))
+            results['us_only'] = result
+        
+        if 'block_scanners' in features:
+            result = cf.toggle_block_scanners(zone_id, True, status.get('block_scanners_rule_id'))
+            results['block_scanners'] = result
+        
+        if 'block_dupes' in features:
+            result = cf.toggle_block_dupes(zone_id, True, status.get('block_dupes_rule_id'), duration=10)
+            results['block_dupes'] = result
+        
+        return jsonify({'success': True, 'domain': domain, 'zone_id': zone_id, 'results': results})
+        
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()})
+
+
+# =====================================================
+# LIST BUILDER API
+# =====================================================
+
+def build_segment_where_clause(filters):
+    """Build SQL WHERE clause from segment filters."""
+    conditions = []
+    
+    if filters.get('category'):
+        conditions.append(f"e.email_category = '{filters['category']}'")
+    
+    if filters.get('provider'):
+        conditions.append(f"e.email_provider = '{filters['provider']}'")
+    
+    if filters.get('clickers') == 'true':
+        conditions.append("e.is_clicker = true")
+    
+    if filters.get('openers') == 'true':
+        conditions.append("e.is_opener = true")
+    
+    if filters.get('quality') == 'high':
+        conditions.append("e.quality_score >= 70")
+    elif filters.get('quality') == 'medium':
+        conditions.append("e.quality_score >= 40 AND e.quality_score < 70")
+    elif filters.get('quality') == 'low':
+        conditions.append("e.quality_score < 40")
+    
+    if filters.get('domain'):
+        conditions.append(f"e.email_domain = '{filters['domain']}'")
+    
+    if filters.get('state'):
+        conditions.append(f"UPPER(e.state) = '{filters['state'].upper()}'")
+    
+    if filters.get('validation_status') == 'verified':
+        conditions.append("e.validation_status = 'verified'")
+    
+    # 2nd Level Big4 - MX category filter (requires JOIN with domain_mx)
+    if filters.get('mx_category'):
+        conditions.append(f"dm.mx_category = '{filters['mx_category']}'")
+    
+    # All 2nd Level Big4 - matches Google, Microsoft, or Yahoo MX
+    if filters.get('mx_category_big4') == 'true':
+        conditions.append("dm.mx_category IN ('Google', 'Microsoft', 'Yahoo')")
+    
+    return " AND ".join(conditions) if conditions else "1=1"
+
+
+def needs_mx_join(filters):
+    """Check if filter requires JOIN with domain_mx table."""
+    return filters.get('mx_category') is not None or filters.get('mx_category_big4') == 'true'
+
+
+@app.route('/api/list-builder/preset-counts', methods=['POST'])
+def api_list_builder_preset_counts():
+    """Get counts for all presets to populate dropdown."""
+    try:
+        data = request.get_json()
+        presets = data.get('presets', [])
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        counts = {}
+        for preset in presets:
+            key = preset.get('key')
+            filters = preset.get('filters', {})
+            where = build_segment_where_clause(filters)
+            
+            # Check if we need JOIN with domain_mx for mx_category filters
+            if needs_mx_join(filters):
+                sql = f"""SELECT COUNT(*) FROM emails e 
+                         JOIN domain_mx dm ON e.email_domain = dm.domain 
+                         WHERE {where}"""
+            else:
+                sql = f"SELECT COUNT(*) FROM emails e WHERE {where}"
+            cursor.execute(sql)
+            counts[key] = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'counts': counts})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/list-builder/count', methods=['POST'])
+def api_list_builder_count():
+    """Get total unique email count for combined segments."""
+    try:
+        data = request.get_json()
+        segments = data.get('segments', [])
+        
+        if not segments:
+            return jsonify({'error': 'No segments provided'})
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Build UNION query for all segments
+        union_parts = []
+        for segment in segments:
+            filters = segment.get('filters', {})
+            where = build_segment_where_clause(filters)
+            
+            # Check if we need JOIN with domain_mx for mx_category filters
+            if needs_mx_join(filters):
+                union_parts.append(f"""SELECT DISTINCT e.email FROM emails e 
+                                      JOIN domain_mx dm ON e.email_domain = dm.domain 
+                                      WHERE {where}""")
+            else:
+                union_parts.append(f"SELECT DISTINCT e.email FROM emails e WHERE {where}")
+        
+        # Count unique emails across all segments
+        sql = f"SELECT COUNT(DISTINCT email) FROM ({' UNION '.join(union_parts)}) AS combined"
+        cursor.execute(sql)
+        total = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'total': total})
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()})
+
+
+@app.route('/api/list-builder/export', methods=['POST'])
+def api_list_builder_export():
+    """Export combined list from all segments - streaming for large exports."""
+    try:
+        data = request.get_json()
+        segments = data.get('segments', [])
+        email_only = data.get('email_only', False)
+        
+        # Ensure boolean
+        if isinstance(email_only, str):
+            email_only = email_only.lower() == 'true'
+        
+        if not segments:
+            return jsonify({'error': 'No segments provided'})
+        
+        conn = get_db()
+        cursor = conn.cursor(name='list_builder_export')  # Server-side cursor for streaming
+        
+        # Build UNION query for all segments
+        union_parts = []
+        for segment in segments:
+            filters = segment.get('filters', {})
+            where = build_segment_where_clause(filters)
+            
+            # Check if we need JOIN with domain_mx for mx_category filters
+            if email_only:
+                # Email only export
+                if needs_mx_join(filters):
+                    union_parts.append(f"""
+                        SELECT DISTINCT e.email
+                        FROM emails e
+                        JOIN domain_mx dm ON e.email_domain = dm.domain
+                        WHERE {where}
+                    """)
+                else:
+                    union_parts.append(f"""
+                        SELECT DISTINCT e.email
+                        FROM emails e WHERE {where}
+                    """)
+            else:
+                # Full export with all fields
+                if needs_mx_join(filters):
+                    union_parts.append(f"""
+                        SELECT DISTINCT e.email, e.email_domain, e.email_provider, e.email_brand, e.email_category,
+                               e.quality_score, e.is_clicker, e.is_opener, e.first_name, e.last_name,
+                               e.phone, e.city, e.state, e.zipcode, e.gender,
+                               CAST(e.dob AS TEXT) as dob,
+                               CAST(e.signup_date AS TEXT) as signup_date,
+                               CAST(e.created_at AS TEXT) as created_at,
+                               e.data_source
+                        FROM emails e
+                        JOIN domain_mx dm ON e.email_domain = dm.domain
+                        WHERE {where}
+                    """)
+                else:
+                    union_parts.append(f"""
+                        SELECT DISTINCT e.email, e.email_domain, e.email_provider, e.email_brand, e.email_category,
+                               e.quality_score, e.is_clicker, e.is_opener, e.first_name, e.last_name,
+                               e.phone, e.city, e.state, e.zipcode, e.gender,
+                               CAST(e.dob AS TEXT) as dob,
+                               CAST(e.signup_date AS TEXT) as signup_date,
+                               CAST(e.created_at AS TEXT) as created_at,
+                               e.data_source
+                        FROM emails e WHERE {where}
+                    """)
+        
+        if email_only:
+            sql = ' UNION '.join(union_parts) + " ORDER BY email"
+        else:
+            sql = ' UNION '.join(union_parts) + " ORDER BY quality_score DESC NULLS LAST"
+        
+        cursor.execute(sql)
+        
+        # Stream response for large exports
+        import io
+        import csv
+        from flask import Response
+        
+        def generate():
+            output = io.StringIO()
+            writer = csv.writer(output)
+            
+            # Header
+            if email_only:
+                writer.writerow(['email'])
+            else:
+                writer.writerow(['email', 'email_domain', 'email_provider', 'email_brand', 'email_category',
+                                'quality_score', 'is_clicker', 'is_opener', 'first_name', 'last_name',
+                                'phone', 'city', 'state', 'zipcode', 'gender', 'dob', 'signup_date', 
+                                'created_at', 'data_source'])
+            yield output.getvalue()
+            output.seek(0)
+            output.truncate(0)
+            
+            # Stream rows in batches
+            batch_size = 10000
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+                for row in rows:
+                    writer.writerow(row)
+                yield output.getvalue()
+                output.seek(0)
+                output.truncate(0)
+            
+            cursor.close()
+            conn.close()
+        
+        filename = 'emails_only.csv' if email_only else 'combined_list.csv'
+        return Response(
+            generate(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+        
+    except Exception as e:
+        import traceback
+        print(f"Export error: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()})
 
 
 if __name__ == '__main__':
